@@ -4,7 +4,7 @@
   "private": true,
   "description": "BCSK API — serves the web frontend and future mobile apps",
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && node scripts/bundle-vendor.mjs",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
@@ -16,7 +16,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:rotate-passwords": "tsx prisma/rotate-passwords.ts",
     "db:backfill-payer": "tsx prisma/backfill-payer-user-id.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate && node scripts/bundle-vendor.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -33,7 +33,6 @@
     "cloudinary": "^2.7.0",
     "cookie-parser": "^1.4.7",
     "helmet": "^8.1.0",
-    "isomorphic-dompurify": "^3.19.0",
     "jose": "^6.2.3",
     "marked": "^18.0.5",
     "nodemailer": "^9.0.3",
@@ -42,6 +41,7 @@
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "sanitize-html": "^2.17.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -55,8 +55,10 @@
     "@types/nodemailer": "^8.0.1",
     "@types/pdfkit": "^0.17.6",
     "@types/qrcode": "^1.5.6",
+    "@types/sanitize-html": "^2.16.1",
     "@typescript-eslint/eslint-plugin": "^8",
     "@typescript-eslint/parser": "^8",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "tsx": "^4.23.0",
     "typescript": "^5",

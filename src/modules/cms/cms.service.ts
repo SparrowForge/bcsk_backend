@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtml from "../../common/sanitize-html";
 import { PrismaService } from "../../database/prisma.service";
 import { notFound } from "../../common/errors/app-error";
 import { toPage, toPrismaPage, type Page, type PageRequest } from "../../common/pagination/cursor";
@@ -25,12 +25,13 @@ const ALLOWED_ATTR = ["href", "title", "alt", "src", "colspan", "rowspan", "clas
 export async function renderMarkdown(md: string): Promise<string> {
   const { marked } = await getMarked();
   const html = marked.parse(md, { async: false }) as string;
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|\/|#)/i,
-    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input"],
-    FORBID_ATTR: ["style", "srcset", "formaction", "form"],
+  // `script`/`style` and every tag outside ALLOWED_TAGS are dropped by the allowlist alone —
+  // sanitize-html additionally discards a <script>/<style> tag's inner content, not just the
+  // tag, so no inline payload can survive as bare text either.
+  return sanitizeHtml(html, {
+    allowedTags: ALLOWED_TAGS,
+    allowedAttributes: { "*": ALLOWED_ATTR },
+    allowedSchemes: ["http", "https", "mailto", "tel"],
   });
 }
 
