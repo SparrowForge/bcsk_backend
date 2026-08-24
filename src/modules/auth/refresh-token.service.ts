@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { PrismaService } from "@/database/prisma.service";
-import { unauthenticated } from "@/common/errors/app-error";
-import { log } from "@/common/logger";
+import { PrismaService } from "../../database/prisma.service";
+import { unauthenticated } from "../../common/errors/app-error";
+import { log } from "../../common/logger";
 
 /**
  * Phase F — refresh tokens for mobile clients.

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { AdminService } from "@/modules/admin/admin.service";
-import { OfficeService } from "@/modules/office/office.service";
+import { AdminService } from "../src/modules/admin/admin.service";
+import { OfficeService } from "../src/modules/office/office.service";
 
 /**
  * Dashboard counts, encoded because every one of these was a *silent* wrong number.

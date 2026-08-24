@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { apiPrefix, apiVersion, apiBasePath, apiBaseUrl } from "@/config/api";
+import { apiPrefix, apiVersion, apiBasePath, apiBaseUrl } from "../src/config/api";
 
 /**
  * The API path is assembled from `API_PREFIX` and `API_VERSION` rather than hard-coded, so

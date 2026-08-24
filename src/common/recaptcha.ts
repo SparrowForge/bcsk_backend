@@ -1,4 +1,4 @@
-import { log, errMessage } from "@/common/logger";
+import { log, errMessage } from "./logger";
 
 /**
  * Google reCAPTCHA v2 verification (4.3).

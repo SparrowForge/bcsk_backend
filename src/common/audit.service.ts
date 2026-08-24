@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@/database/prisma.service";
+import { PrismaService } from "../database/prisma.service";
 
 /**
  * Who did what, for the school's own records — distinct from `logger`, which records what

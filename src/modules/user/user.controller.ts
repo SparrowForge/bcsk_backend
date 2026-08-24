@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import { z } from "zod";
 import { UserService } from "./user.service";
-import { CurrentActor, RequirePermission } from "@/common/decorators/actor.decorator";
-import type { Actor } from "@/common/actor";
+import { CurrentActor, RequirePermission } from "../../common/decorators/actor.decorator";
+import type { Actor } from "../../common/actor";
 
 const createUser = z.object({
   loginId: z.string().trim().min(1),

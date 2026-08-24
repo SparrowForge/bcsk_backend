@@ -2,8 +2,8 @@ import { Controller, Get, Param, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { z } from "zod";
 import { DocumentService, type DocumentType } from "./document.service";
-import { CurrentActor, Public, RequirePermission } from "@/common/decorators/actor.decorator";
-import type { Actor } from "@/common/actor";
+import { CurrentActor, Public, RequirePermission } from "../../common/decorators/actor.decorator";
+import type { Actor } from "../../common/actor";
 
 const idParam = z.coerce.number().int().positive();
 const typeParam = z.enum(["certificate", "id-card", "result-sheet"]);

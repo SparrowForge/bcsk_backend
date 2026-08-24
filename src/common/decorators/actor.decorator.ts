@@ -1,7 +1,7 @@
 import { createParamDecorator, ExecutionContext, SetMetadata } from "@nestjs/common";
 import type { Request } from "express";
-import type { Actor } from "@/common/actor";
-import type { Permission } from "@/common/permissions";
+import type { Actor } from "../actor";
+import type { Permission } from "../permissions";
 
 /** Marks a route as reachable without a credential. Auth is required by default (risk R10). */
 export const IS_PUBLIC = "isPublic";

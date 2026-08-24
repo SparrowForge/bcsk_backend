@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { PrismaService } from "@/database/prisma.service";
-import { AuditService } from "@/common/audit.service";
-import { MailService } from "@/common/mail.service";
-import { conflict, notFound, unprocessable } from "@/common/errors/app-error";
-import { ROLES } from "@/common/constants";
-import { log } from "@/common/logger";
-import type { Actor } from "@/common/actor";
+import { PrismaService } from "../../database/prisma.service";
+import { AuditService } from "../../common/audit.service";
+import { MailService } from "../../common/mail.service";
+import { conflict, notFound, unprocessable } from "../../common/errors/app-error";
+import { ROLES } from "../../common/constants";
+import { log } from "../../common/logger";
+import type { Actor } from "../../common/actor";
 
 @Injectable()
 export class UserService {

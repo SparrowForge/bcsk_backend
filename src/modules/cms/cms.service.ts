@@ -1,10 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { marked } from "marked";
 import DOMPurify from "isomorphic-dompurify";
-import { PrismaService } from "@/database/prisma.service";
-import { notFound } from "@/common/errors/app-error";
-import { toPage, toPrismaPage, type Page, type PageRequest } from "@/common/pagination/cursor";
-import type { Lang } from "@/common/constants";
+import { PrismaService } from "../../database/prisma.service";
+import { notFound } from "../../common/errors/app-error";
+import { toPage, toPrismaPage, type Page, type PageRequest } from "../../common/pagination/cursor";
+import type { Lang } from "../../common/constants";
 
 /**
  * Public site content: CMS pages, news, gallery, the teacher directory and the fee table.

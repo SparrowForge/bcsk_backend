@@ -1,11 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import { v2 as cloudinary } from "cloudinary";
-import { PrismaService } from "@/database/prisma.service";
-import { forbidden, notFound, unprocessable, misconfigured } from "@/common/errors/app-error";
-import { roleHas } from "@/common/permissions";
-import { log, errMessage } from "@/common/logger";
-import type { Actor, MaybeActor } from "@/common/actor";
+import { PrismaService } from "../../database/prisma.service";
+import { forbidden, notFound, unprocessable, misconfigured } from "../../common/errors/app-error";
+import { roleHas } from "../../common/permissions";
+import { log, errMessage } from "../../common/logger";
+import type { Actor, MaybeActor } from "../../common/actor";
 
 /**
  * PERF-4: uploads move to Cloudinary. Storing blobs in Postgres was a workaround for

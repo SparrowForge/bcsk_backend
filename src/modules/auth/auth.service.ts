@@ -1,12 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import type { Request } from "express";
 import bcrypt from "bcryptjs";
-import { PrismaService } from "@/database/prisma.service";
-import { requiredSecret, intFromEnv } from "@/config/env";
-import { log } from "@/common/logger";
-import { getJose } from "@/common/jose";
-import type { Role } from "@/common/constants";
-import type { Actor, ActorTransport } from "@/common/actor";
+import { PrismaService } from "../../database/prisma.service";
+import { requiredSecret, intFromEnv } from "../../config/env";
+import { log } from "../../common/logger";
+import { getJose } from "../../common/jose";
+import type { Role } from "../../common/constants";
+import type { Actor, ActorTransport } from "../../common/actor";
 
 /**
  * Authentication for both transports.

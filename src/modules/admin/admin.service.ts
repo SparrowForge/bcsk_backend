@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@/database/prisma.service";
-import { AuditService } from "@/common/audit.service";
-import { MailService } from "@/common/mail.service";
-import { PaymentService } from "@/modules/payment/payment.service";
-import { SEMESTER_CURRENT } from "@/common/constants";
-import { conflict, notFound, unprocessable } from "@/common/errors/app-error";
-import { toPage, toPrismaPage, type PageRequest } from "@/common/pagination/cursor";
-import { log } from "@/common/logger";
-import type { Actor } from "@/common/actor";
+import { PrismaService } from "../../database/prisma.service";
+import { AuditService } from "../../common/audit.service";
+import { MailService } from "../../common/mail.service";
+import { PaymentService } from "../payment/payment.service";
+import { SEMESTER_CURRENT } from "../../common/constants";
+import { conflict, notFound, unprocessable } from "../../common/errors/app-error";
+import { toPage, toPrismaPage, type PageRequest } from "../../common/pagination/cursor";
+import { log } from "../../common/logger";
+import type { Actor } from "../../common/actor";
 
 /**
  * The Admin Panel's read and write surface.

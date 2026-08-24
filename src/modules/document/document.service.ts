@@ -1,10 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@/database/prisma.service";
-import { certificatePdf, idCardPdf, resultSheetPdf, receiptPdf } from "@/common/pdf";
-import { SEMESTER_CURRENT, classLevelLabel } from "@/common/constants";
-import { forbidden, notFound, unprocessable } from "@/common/errors/app-error";
-import { roleHas } from "@/common/permissions";
-import type { Actor } from "@/common/actor";
+import { PrismaService } from "../../database/prisma.service";
+import { certificatePdf, idCardPdf, resultSheetPdf, receiptPdf } from "../../common/pdf";
+import { SEMESTER_CURRENT, classLevelLabel } from "../../common/constants";
+import { forbidden, notFound, unprocessable } from "../../common/errors/app-error";
+import { roleHas } from "../../common/permissions";
+import type { Actor } from "../../common/actor";
 
 export type DocumentType = "certificate" | "id-card" | "result-sheet";
 

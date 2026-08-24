@@ -3,8 +3,8 @@ import type { Request } from "express";
 import { z } from "zod";
 import { AdmissionService } from "./admission.service";
 import { regularApplicationSchema, specialApplicationSchema } from "./admission.schema";
-import { CurrentActor, Public, RequirePermission } from "@/common/decorators/actor.decorator";
-import type { Actor } from "@/common/actor";
+import { CurrentActor, Public, RequirePermission } from "../../common/decorators/actor.decorator";
+import type { Actor } from "../../common/actor";
 
 const idParam = z.coerce.number().int().positive();
 const pageQuery = z.object({

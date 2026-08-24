@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { z } from "zod";
 import { PaymentService } from "./payment.service";
-import { CurrentActor, Public, RequirePermission } from "@/common/decorators/actor.decorator";
-import { requireOwnerOr } from "@/common/actor";
-import type { Actor } from "@/common/actor";
+import { CurrentActor, Public, RequirePermission } from "../../common/decorators/actor.decorator";
+import { requireOwnerOr } from "../../common/actor";
+import type { Actor } from "../../common/actor";
 
 const tokenQuery = z.object({ token: z.string().min(1) });
 const cardOrder = z.object({ applicationId: z.coerce.number().int().positive(), token: z.string().min(1) });

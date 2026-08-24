@@ -5,10 +5,10 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { z } from "zod";
 import type { Request, Response } from "express";
 import { FileService } from "./file.service";
-import { Public } from "@/common/decorators/actor.decorator";
-import { RateLimitService } from "@/common/rate-limit.service";
-import { unprocessable, forbidden } from "@/common/errors/app-error";
-import type { Actor } from "@/common/actor";
+import { Public } from "../../common/decorators/actor.decorator";
+import { RateLimitService } from "../../common/rate-limit.service";
+import { unprocessable, forbidden } from "../../common/errors/app-error";
+import type { Actor } from "../../common/actor";
 
 /**
  * SEC-5.1: deny-by-default file delivery.

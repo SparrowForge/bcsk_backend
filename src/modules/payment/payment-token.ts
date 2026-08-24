@@ -1,7 +1,7 @@
-import { requiredSecret } from "@/config/env";
-import { unauthenticated } from "@/common/errors/app-error";
-import { log, errMessage } from "@/common/logger";
-import { getJose } from "@/common/jose";
+import { requiredSecret } from "../../config/env";
+import { unauthenticated } from "../../common/errors/app-error";
+import { log, errMessage } from "../../common/logger";
+import { getJose } from "../../common/jose";
 
 /**
  * SEC-7: a capability token binding a visitor to one application's payment step.

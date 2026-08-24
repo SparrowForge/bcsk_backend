@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from "@nestjs/common";
-import { PrismaService } from "@/database/prisma.service";
-import { Public } from "@/common/decorators/actor.decorator";
+import { PrismaService } from "../../database/prisma.service";
+import { Public } from "../../common/decorators/actor.decorator";
 
 /**
  * Liveness and readiness for the reverse proxy and uptime checks.

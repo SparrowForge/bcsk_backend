@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
 import { z } from "zod";
 import { ClassroomService } from "./classroom.service";
-import { CurrentActor, Public } from "@/common/decorators/actor.decorator";
-import { forbidden } from "@/common/errors/app-error";
-import type { Actor, MaybeActor } from "@/common/actor";
+import { CurrentActor, Public } from "../../common/decorators/actor.decorator";
+import { forbidden } from "../../common/errors/app-error";
+import type { Actor, MaybeActor } from "../../common/actor";
 import type { Request } from "express";
 import { Req } from "@nestjs/common";
 

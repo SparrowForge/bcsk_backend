@@ -1,9 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@/database/prisma.service";
-import { SEMESTER_CURRENT } from "@/common/constants";
-import { conflict, forbidden, notFound, unprocessable } from "@/common/errors/app-error";
+import { PrismaService } from "../../database/prisma.service";
+import { SEMESTER_CURRENT } from "../../common/constants";
+import { conflict, forbidden, notFound, unprocessable } from "../../common/errors/app-error";
 import { randomBytes } from "node:crypto";
-import type { Actor, MaybeActor } from "@/common/actor";
+import type { Actor, MaybeActor } from "../../common/actor";
 
 /**
  * The student surface. Every query is scoped to the calling actor's own id — a student can

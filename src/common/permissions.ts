@@ -1,4 +1,4 @@
-import { ROLES, type Role } from "@/common/constants";
+import { ROLES, type Role } from "./constants";
 
 /**
  * SEC-4: the single source of truth for what each admin role may do.

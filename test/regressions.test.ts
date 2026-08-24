@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { issuePaymentToken, assertPaymentToken, verifyPaymentToken } from "@/modules/payment/payment-token";
-import { isAppError, httpStatusFor, ERROR_CODES } from "@/common/errors/app-error";
-import { intFromEnv, requiredSecret } from "@/config/env";
-import { roleHas, permissionsFor, PERMISSIONS } from "@/common/permissions";
-import type { Role } from "@/common/constants";
+import { issuePaymentToken, assertPaymentToken, verifyPaymentToken } from "../src/modules/payment/payment-token";
+import { isAppError, httpStatusFor, ERROR_CODES } from "../src/common/errors/app-error";
+import { intFromEnv, requiredSecret } from "../src/config/env";
+import { roleHas, permissionsFor, PERMISSIONS } from "../src/common/permissions";
+import type { Role } from "../src/common/constants";
 
 /**
  * Regressions found during the split, encoded so they cannot return.

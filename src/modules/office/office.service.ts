@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@/database/prisma.service";
-import { forbidden, notFound, unprocessable } from "@/common/errors/app-error";
-import { SEMESTER_CURRENT } from "@/common/constants";
-import type { Actor } from "@/common/actor";
+import { PrismaService } from "../../database/prisma.service";
+import { forbidden, notFound, unprocessable } from "../../common/errors/app-error";
+import { SEMESTER_CURRENT } from "../../common/constants";
+import type { Actor } from "../../common/actor";
 
 /** Attendance values are validated server-side, never trusted from a form. */
 const VALID_ATTENDANCE = ["PRESENT", "ABSENT", "LATE"];

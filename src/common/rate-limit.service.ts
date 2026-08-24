@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@/database/prisma.service";
-import { log } from "@/common/logger";
-import { rateLimited } from "@/common/errors/app-error";
+import { PrismaService } from "../database/prisma.service";
+import { log } from "./logger";
+import { rateLimited } from "./errors/app-error";
 
 /**
  * SEC-8: fixed-window rate limiting, stored in the database.

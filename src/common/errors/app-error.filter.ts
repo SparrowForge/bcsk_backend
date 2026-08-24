@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { ZodError } from "zod";
 import { Prisma } from "@prisma/client";
 import { AppError, ERROR_CODES, httpStatusFor, isAppError, type ErrorDetails } from "./app-error";
-import { log, errMessage } from "@/common/logger";
+import { log, errMessage } from "../logger";
 
 /**
  * The single place a thrown value becomes an HTTP response.

@@ -1,4 +1,4 @@
-import { validationFailed } from "@/common/errors/app-error";
+import { validationFailed } from "../errors/app-error";
 
 /**
  * Cursor pagination for list endpoints.

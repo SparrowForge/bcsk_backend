@@ -1,6 +1,6 @@
-import { ADMIN_ROLES, type Role } from "@/common/constants";
-import { roleHas, type Permission } from "@/common/permissions";
-import { forbidden, unauthenticated } from "@/common/errors/app-error";
+import { ADMIN_ROLES, type Role } from "./constants";
+import { roleHas, type Permission } from "./permissions";
+import { forbidden, unauthenticated } from "./errors/app-error";
 
 /**
  * Who is performing an operation, independent of how they proved it.

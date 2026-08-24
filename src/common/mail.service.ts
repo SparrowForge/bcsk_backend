@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import nodemailer from "nodemailer";
-import { log, errMessage } from "@/common/logger";
+import { log, errMessage } from "./logger";
 
 /**
  * Outbound mail. When SMTP is unconfigured the message is logged rather than sent, so

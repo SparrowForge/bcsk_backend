@@ -2,11 +2,11 @@ import { Injectable } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
-import { PrismaService } from "@/database/prisma.service";
-import { MailService } from "@/common/mail.service";
-import { SEMESTER_CURRENT } from "@/common/constants";
-import { log, errMessage } from "@/common/logger";
-import { conflict, misconfigured, notFound, upstreamFailed } from "@/common/errors/app-error";
+import { PrismaService } from "../../database/prisma.service";
+import { MailService } from "../../common/mail.service";
+import { SEMESTER_CURRENT } from "../../common/constants";
+import { log, errMessage } from "../../common/logger";
+import { conflict, misconfigured, notFound, upstreamFailed } from "../../common/errors/app-error";
 import { assertPaymentToken } from "./payment-token";
 
 export const krw = (n: number) => `₩${n.toLocaleString("en-US")}`;

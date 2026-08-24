@@ -1,12 +1,12 @@
 import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
-import { IS_PUBLIC, REQUIRED_PERMISSION } from "@/common/decorators/actor.decorator";
-import { AuthService } from "@/modules/auth/auth.service";
-import { roleHas, type Permission } from "@/common/permissions";
-import { forbidden, unauthenticated } from "@/common/errors/app-error";
-import { log } from "@/common/logger";
-import type { Actor } from "@/common/actor";
+import { IS_PUBLIC, REQUIRED_PERMISSION } from "../decorators/actor.decorator";
+import { AuthService } from "../../modules/auth/auth.service";
+import { roleHas, type Permission } from "../permissions";
+import { forbidden, unauthenticated } from "../errors/app-error";
+import { log } from "../logger";
+import type { Actor } from "../actor";
 
 /**
  * Registered globally in AppModule, so **every** route is authenticated unless it is

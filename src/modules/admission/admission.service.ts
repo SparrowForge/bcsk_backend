@@ -1,15 +1,15 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@/database/prisma.service";
-import { AuditService } from "@/common/audit.service";
-import { MailService } from "@/common/mail.service";
-import { RateLimitService } from "@/common/rate-limit.service";
-import { verifyRecaptcha } from "@/common/recaptcha";
-import { notFound, unprocessable } from "@/common/errors/app-error";
-import { toPage, toPrismaPage, type PageRequest } from "@/common/pagination/cursor";
-import { log } from "@/common/logger";
-import { issuePaymentToken, assertPaymentToken } from "@/modules/payment/payment-token";
-import { PaymentService } from "@/modules/payment/payment.service";
-import type { Actor } from "@/common/actor";
+import { PrismaService } from "../../database/prisma.service";
+import { AuditService } from "../../common/audit.service";
+import { MailService } from "../../common/mail.service";
+import { RateLimitService } from "../../common/rate-limit.service";
+import { verifyRecaptcha } from "../../common/recaptcha";
+import { notFound, unprocessable } from "../../common/errors/app-error";
+import { toPage, toPrismaPage, type PageRequest } from "../../common/pagination/cursor";
+import { log } from "../../common/logger";
+import { issuePaymentToken, assertPaymentToken } from "../payment/payment-token";
+import { PaymentService } from "../payment/payment.service";
+import type { Actor } from "../../common/actor";
 import type { RegularApplicationInput, SpecialApplicationInput } from "./admission.schema";
 
 /** GAP-12: the specification restricts admission to children aged 5 and above. */

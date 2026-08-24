@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query } from "@nestjs/common";
 import { z } from "zod";
 import { CmsService } from "./cms.service";
-import { Public } from "@/common/decorators/actor.decorator";
+import { Public } from "../../common/decorators/actor.decorator";
 
 const langSchema = z.enum(["en", "bn", "ko"]).default("en");
 const pageQuery = z.object({

@@ -2,10 +2,10 @@ import { Body, Controller, Get, Param, Post, Query, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { z } from "zod";
 import { AdminService } from "./admin.service";
-import { Public } from "@/common/decorators/actor.decorator";
-import { RateLimitService } from "@/common/rate-limit.service";
-import { verifyRecaptcha } from "@/common/recaptcha";
-import { unprocessable } from "@/common/errors/app-error";
+import { Public } from "../../common/decorators/actor.decorator";
+import { RateLimitService } from "../../common/rate-limit.service";
+import { verifyRecaptcha } from "../../common/recaptcha";
+import { unprocessable } from "../../common/errors/app-error";
 
 const contactSchema = z.object({
   name: z.string().trim().min(2).max(120),

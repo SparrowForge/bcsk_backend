@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import { z } from "zod";
 import { OfficeService } from "./office.service";
-import { CurrentActor } from "@/common/decorators/actor.decorator";
-import { forbidden } from "@/common/errors/app-error";
-import type { Actor } from "@/common/actor";
+import { CurrentActor } from "../../common/decorators/actor.decorator";
+import { forbidden } from "../../common/errors/app-error";
+import type { Actor } from "../../common/actor";
 
 const idParam = z.coerce.number().int().positive();
 const attendance = z.object({
