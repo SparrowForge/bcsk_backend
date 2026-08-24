@@ -1,10 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import { marked } from "marked";
 import DOMPurify from "isomorphic-dompurify";
 import { PrismaService } from "../../database/prisma.service";
 import { notFound } from "../../common/errors/app-error";
 import { toPage, toPrismaPage, type Page, type PageRequest } from "../../common/pagination/cursor";
 import type { Lang } from "../../common/constants";
+import { getMarked } from "../../common/marked";
 
 /**
  * Public site content: CMS pages, news, gallery, the teacher directory and the fee table.
@@ -22,7 +22,8 @@ const ALLOWED_TAGS = [
 ];
 const ALLOWED_ATTR = ["href", "title", "alt", "src", "colspan", "rowspan", "class", "id"];
 
-export function renderMarkdown(md: string): string {
+export async function renderMarkdown(md: string): Promise<string> {
+  const { marked } = await getMarked();
   const html = marked.parse(md, { async: false }) as string;
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
@@ -47,7 +48,7 @@ export class CmsService {
       slug: page.slug,
       lang: page.lang,
       title: page.title,
-      html: renderMarkdown(page.content),
+      html: await renderMarkdown(page.content),
       updatedAt: page.updatedAt,
     };
   }
@@ -65,7 +66,7 @@ export class CmsService {
   async getNewsItem(id: number) {
     const item = await this.prisma.eventNews.findFirst({ where: { id, published: true } });
     if (!item) throw notFound("News item");
-    return { ...item, html: renderMarkdown(item.body) };
+    return { ...item, html: await renderMarkdown(item.body) };
   }
 
   /** Teachers who have opted into the public directory. */
