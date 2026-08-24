@@ -1,7 +1,7 @@
 import { requiredSecret } from "../../config/env";
 import { unauthenticated } from "../../common/errors/app-error";
 import { log, errMessage } from "../../common/logger";
-import { getJose } from "../../common/jose";
+import { SignJWT, jwtVerify } from "../../common/jose";
 
 /**
  * SEC-7: a capability token binding a visitor to one application's payment step.
@@ -23,7 +23,6 @@ const AUDIENCE = "bcsk:application-payment";
 const TTL = "14d";
 
 export async function issuePaymentToken(applicationId: number): Promise<string> {
-  const { SignJWT } = await getJose();
   return new SignJWT({})
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(String(applicationId))
@@ -46,7 +45,6 @@ export async function verifyPaymentToken(
     return false;
   }
   try {
-    const { jwtVerify } = await getJose();
     const { payload } = await jwtVerify(token, SECRET, { audience: AUDIENCE });
     if (payload.sub !== String(applicationId)) {
       // A valid token for a *different* application — the signature is fine, so this is

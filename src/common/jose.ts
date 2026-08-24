@@ -1,9 +1,11 @@
 import type * as Jose from "jose";
-import { loadEsm } from "./esm-import";
 
-let josePromise: Promise<typeof Jose> | undefined;
+/**
+ * `jose` ships ESM-only, which our CommonJS build cannot `require()` on Vercel's runtime.
+ * `scripts/bundle-vendor.mjs` pre-bundles it to a self-contained CJS file at build time, so a
+ * plain synchronous require is all that is needed here. See `common/sanitize-html.ts`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const jose = require("../vendor/jose.cjs") as typeof Jose;
 
-export function getJose(): Promise<typeof Jose> {
-  josePromise ??= loadEsm<typeof Jose>("jose");
-  return josePromise;
-}
+export const { SignJWT, jwtVerify } = jose;

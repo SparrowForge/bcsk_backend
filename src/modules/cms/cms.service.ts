@@ -4,7 +4,7 @@ import { PrismaService } from "../../database/prisma.service";
 import { notFound } from "../../common/errors/app-error";
 import { toPage, toPrismaPage, type Page, type PageRequest } from "../../common/pagination/cursor";
 import type { Lang } from "../../common/constants";
-import { getMarked } from "../../common/marked";
+import { marked } from "../../common/marked";
 
 /**
  * Public site content: CMS pages, news, gallery, the teacher directory and the fee table.
@@ -23,7 +23,6 @@ const ALLOWED_TAGS = [
 const ALLOWED_ATTR = ["href", "title", "alt", "src", "colspan", "rowspan", "class", "id"];
 
 export async function renderMarkdown(md: string): Promise<string> {
-  const { marked } = await getMarked();
   const html = marked.parse(md, { async: false }) as string;
   // `script`/`style` and every tag outside ALLOWED_TAGS are dropped by the allowlist alone —
   // sanitize-html additionally discards a <script>/<style> tag's inner content, not just the

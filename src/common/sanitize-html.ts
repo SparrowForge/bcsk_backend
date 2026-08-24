@@ -9,8 +9,7 @@ import type SanitizeHtml from "sanitize-html";
  * `scripts/bundle-vendor.mjs` pre-bundles the whole `sanitize-html` dependency graph into a
  * single self-contained CommonJS file at build time (regenerated on every `npm run build`, not
  * committed — see .gitignore), so there is no separate runtime `require()` of the ESM-only
- * package left for Vercel's runtime to choke on. Once bundled it's a plain CJS file, so a
- * synchronous `require()` here — unlike `getJose()`/`getMarked()` — is all that's needed.
+ * package left for Vercel's runtime to choke on. `jose` and `marked` are handled the same way.
  */
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const sanitizeHtml = require("../vendor/sanitize-html.cjs") as typeof SanitizeHtml;

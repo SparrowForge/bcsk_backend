@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { PrismaService } from "../../database/prisma.service";
 import { requiredSecret, intFromEnv } from "../../config/env";
 import { log } from "../../common/logger";
-import { getJose } from "../../common/jose";
+import { SignJWT, jwtVerify } from "../../common/jose";
 import type { Role } from "../../common/constants";
 import type { Actor, ActorTransport } from "../../common/actor";
 
@@ -34,7 +34,6 @@ export class AuthService {
 
   /** Issue a session JWT. Used for the web cookie today; Phase F adds access/refresh pairs. */
   async signSession(user: { id: number; loginId: string; role: string; name: string }): Promise<string> {
-    const { SignJWT } = await getJose();
     return new SignJWT({ loginId: user.loginId, role: user.role, name: user.name })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(String(user.id))
@@ -57,7 +56,6 @@ export class AuthService {
   async sessionFromToken(token: string | undefined, transport: ActorTransport): Promise<Actor | null> {
     if (!token) return null;
     try {
-      const { jwtVerify } = await getJose();
       const { payload } = await jwtVerify(token, this.secret);
       const userId = Number(payload.sub);
       const user = await this.prisma.user.findUnique({

@@ -27,6 +27,8 @@ const targets = [
     name: "sanitize-html",
     entry: path.join(backendRoot, "node_modules", "sanitize-html", "index.js"),
   },
+  { name: "jose", entry: path.join(backendRoot, "node_modules", "jose", "dist", "webapi", "index.js") },
+  { name: "marked", entry: path.join(backendRoot, "node_modules", "marked", "lib", "marked.esm.js") },
 ];
 
 for (const t of targets) {
