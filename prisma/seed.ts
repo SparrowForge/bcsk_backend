@@ -29,10 +29,11 @@ async function main() {
 
   /* ---------------- Settings (stats, integrations, bank) ---------------- */
   const settings: Record<string, string> = {
-    stat_total_students: "30",
+    // Figures the school publishes in its own design deck (July 2025).
+    stat_total_students: "120+",
     stat_total_classes: "6",
-    stat_special_courses: "6",
-    stat_teachers_staff: "9",
+    stat_special_courses: "8",
+    stat_teachers_staff: "15+",
     whatsapp_number: "+821095998901",
     support_email: "bcskr22@gmail.com",
     school_phone: "+82 10-8948-3447",

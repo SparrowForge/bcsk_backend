@@ -8,23 +8,23 @@ const pages: Page[] = [
   {
     slug: "home-hero",
     lang: "en",
-    title: "Kids are the best explorers in the world!",
+    title: "First Bangladeshi School in Korea",
     content:
-      "Welcome to the **first Bangladeshi school in Korea** — where children of the Bangladeshi community grow with their mother language, their culture, their Deen, and a world-class education.",
+      "Established with the motto **“Quality & Moral Education”**, Bangladesh Community School, Korea began serving in 2022 with 35 students across three classes — Pre-Primary to Class 2. Three years on it is a family of 120+ students from Pre-Primary to Class 5, and it offers special courses in IELTS for Kids, Abacus, Debate Club, and Qur’an for a range of ages including Qur’an Hifz.",
   },
   {
     slug: "home-hero",
     lang: "bn",
-    title: "শিশুরাই পৃথিবীর সেরা অভিযাত্রী!",
+    title: "কোরিয়ার প্রথম বাংলাদেশি স্কুল",
     content:
-      "**কোরিয়ার প্রথম বাংলাদেশি স্কুলে** স্বাগতম — যেখানে বাংলাদেশি কমিউনিটির সন্তানেরা বেড়ে ওঠে মাতৃভাষা, সংস্কৃতি, দ্বীন এবং বিশ্বমানের শিক্ষা নিয়ে।",
+      "**“গুণগত ও নৈতিক শিক্ষা”** মোটো নিয়ে প্রতিষ্ঠিত বাংলাদেশ কমিউনিটি স্কুল, কোরিয়া ২০২২ সালে মাত্র ৩৫ জন শিক্ষার্থী ও তিনটি শ্রেণি — প্রি-প্রাইমারি থেকে দ্বিতীয় শ্রেণি — নিয়ে যাত্রা শুরু করে। তিন বছর পর এখন এটি প্রি-প্রাইমারি থেকে পঞ্চম শ্রেণি পর্যন্ত ১২০+ শিক্ষার্থীর এক বিশাল পরিবার। এর সাথে রয়েছে শিশুদের IELTS, অ্যাবাকাস, বিতর্ক ক্লাব এবং সকল বয়সের জন্য কুরআন ও কুরআন হিফজসহ বিশেষ কোর্স।",
   },
   {
     slug: "home-hero",
     lang: "ko",
-    title: "아이들은 세상에서 가장 훌륭한 탐험가입니다!",
+    title: "한국 최초의 방글라데시 학교",
     content:
-      "**한국 최초의 방글라데시 학교**에 오신 것을 환영합니다 — 방글라데시 커뮤니티의 아이들이 모국어와 문화, 신앙, 그리고 세계적 수준의 교육과 함께 성장하는 곳입니다.",
+      "**“질 높은 교육과 도덕 교육”**을 교훈으로 설립된 방글라데시 커뮤니티 스쿨 코리아는 2022년 학생 35명과 세 개 학급—프리프라이머리부터 2학년까지—로 문을 열었습니다. 3년이 지난 지금은 프리프라이머리부터 5학년까지 120명 이상의 학생이 함께하는 큰 가족입니다. 또한 어린이 IELTS, 주판, 토론 동아리, 그리고 다양한 연령대를 위한 쿠란 및 쿠란 히프즈 등 특별 과정을 운영합니다.",
   },
 
   /* ------------ About ------------ */
