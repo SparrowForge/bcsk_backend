@@ -3,7 +3,7 @@ import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit.service";
 import { MailService } from "../../common/mail.service";
 import { PaymentService } from "../payment/payment.service";
-import { SEMESTER_CURRENT } from "../../common/constants";
+import { SEMESTER_CURRENT, classLevelOrder } from "../../common/constants";
 import { conflict, notFound, unprocessable } from "../../common/errors/app-error";
 import { toPage, toPrismaPage, type PageRequest } from "../../common/pagination/cursor";
 import { log } from "../../common/logger";
@@ -753,8 +753,10 @@ export class AdminService {
           label: regular ? s.classLevel! : s.course.name,
           classLevel: regular ? s.classLevel : null,
           courseSlug: regular ? null : s.course.slug,
-          // Regular levels first, then the special courses, matching the printed board.
-          order: regular ? s.course.displayOrder : 1000 + s.course.displayOrder,
+          // Regular levels first and in ladder order (Pre-Primary before Class 1), then the
+          // special courses. Ordering a level by its *course* order put whichever subject
+          // happened to be first in the timetable at the head of the board.
+          order: regular ? classLevelOrder(s.classLevel!) : 1000 + s.course.displayOrder,
           sessions: [],
         };
         groups.set(key, g);

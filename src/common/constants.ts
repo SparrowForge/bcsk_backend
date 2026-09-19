@@ -18,6 +18,22 @@ export const CLASS_LEVELS = [
   { key: "CLASS_5", label: "Class 5" },
 ] as const;
 
+/**
+ * Where a class level sits in the ladder, for anything that lists levels in order.
+ *
+ * `ClassSession.classLevel` is free text, so the school runs sections this list does not
+ * name — "PRE_PRIMARY_A", "PRE_PRIMARY_B". Those sort by their prefix and then
+ * alphabetically, which puts both Pre-Primary sections together and ahead of Class 1
+ * rather than at the end under an unknown key.
+ */
+export function classLevelOrder(key: string): number {
+  const exact = CLASS_LEVELS.findIndex((c) => c.key === key);
+  if (exact >= 0) return exact * 10;
+  const prefix = CLASS_LEVELS.findIndex((c) => key.startsWith(`${c.key}_`));
+  if (prefix >= 0) return prefix * 10 + key.charCodeAt(key.length - 1) % 10;
+  return 900;
+}
+
 export const classLevelLabel = (key: string) =>
   CLASS_LEVELS.find((c) => c.key === key)?.label ?? key;
 
