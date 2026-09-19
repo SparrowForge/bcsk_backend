@@ -632,6 +632,7 @@ export class AdminService {
     "whatsapp_number", "support_email", "school_phone", "school_phone2",
     "bank_name", "bank_account_name", "bank_account_number",
     "semester_1_dates", "semester_2_dates",
+    "school_time_weekday", "school_time_weekend",
   ];
 
   async publicSettings() {
@@ -648,37 +649,144 @@ export class AdminService {
   }
 
   /**
-   * Homepage "campus right now" widget. Reads the same `isLive` flag a teacher toggles from
-   * their own class page (`office.setLive`) — real state a teacher set, never a schedule
-   * guess, so there is no timezone or day-of-week matching to get wrong. Attendee counts are
-   * aggregate (a number), the same class of fact already public via the homepage stat cards.
+   * Homepage office and classroom boards (LP-2, LP-3).
+   *
+   * Everything here is state a member of staff set about themselves: `isLive` from the
+   * teacher's own class page (`office.toggleLive`), `deskStatus` / `returnAt` from their
+   * dashboard. Nothing is inferred from the timetable, so there is no day-of-week or
+   * timezone matching to get wrong — a board that says "in class" means a teacher pressed a
+   * button.
+   *
+   * Three rules keep it honest, and each one is load-bearing:
+   *
+   * - **"In class" is never stored.** A desk reads IN_CLASS because that teacher owns a
+   *   session that is live right now, so the office board cannot contradict the classroom
+   *   board beside it.
+   * - **Only `isPublic` teachers appear**, and only their name, desk label and status — the
+   *   same audience and the same fields as the public Teachers page, never contact details.
+   * - **An idle class reports nothing rather than something.** No live session means a null
+   *   duration and a null attendee count, which the page renders as "—". Attendee counts are
+   *   aggregates, the same class of fact the homepage stat cards already publish.
    */
-  async campusStatus() {
-    const sessions = await this.prisma.classSession.findMany({
-      where: { semester: SEMESTER_CURRENT, active: true },
-      select: {
-        id: true,
-        title: true,
-        classLevel: true,
-        isLive: true,
-        course: { select: { name: true } },
-        teacher: { select: { user: { select: { name: true } } } },
-        _count: { select: { enrollments: { where: { status: "ACTIVE" } } } },
-      },
-      orderBy: [{ isLive: "desc" }, { title: "asc" }],
+  async schoolBoard() {
+    const now = Date.now();
+    const [teachers, sessions] = await Promise.all([
+      this.prisma.teacherProfile.findMany({
+        where: { isPublic: true },
+        select: {
+          id: true,
+          deskName: true,
+          deskStatus: true,
+          returnAt: true,
+          subjects: true,
+          designation: true,
+          photoUrl: true,
+          user: { select: { name: true } },
+        },
+        orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+      }),
+      this.prisma.classSession.findMany({
+        where: { semester: SEMESTER_CURRENT, active: true },
+        select: {
+          id: true,
+          title: true,
+          classLevel: true,
+          isLive: true,
+          liveSince: true,
+          teacherId: true,
+          course: { select: { name: true, slug: true, type: true, displayOrder: true } },
+          teacher: { select: { user: { select: { name: true } } } },
+          _count: { select: { enrollments: { where: { status: "ACTIVE" } } } },
+        },
+        orderBy: [{ isLive: "desc" }, { title: "asc" }],
+      }),
+    ]);
+
+    type Session = (typeof sessions)[number];
+    const liveByTeacher = new Map<number, Session>();
+    for (const s of sessions) if (s.isLive && s.teacherId) liveByTeacher.set(s.teacherId, s);
+
+    const minutesUntil = (at: Date | null) =>
+      at ? Math.max(0, Math.round((at.getTime() - now) / 60_000)) : null;
+    const minutesSince = (at: Date | null) =>
+      at ? Math.max(0, Math.round((now - at.getTime()) / 60_000)) : null;
+
+    const desks = teachers.map((t) => {
+      const live = liveByTeacher.get(t.id);
+      const status = live ? "IN_CLASS" : t.deskStatus === "DESK" ? "DESK" : "OFFLINE";
+      return {
+        id: t.id,
+        // A named desk wins; otherwise the subjects they teach identify the desk, as they do
+        // on the Teachers page. Falling through to the name keeps the card from being blank.
+        deskName: t.deskName ?? t.subjects ?? t.designation ?? t.user.name,
+        teacherName: t.user.name,
+        photoUrl: t.photoUrl,
+        status,
+        classLabel: live ? live.classLevel ?? live.course.name : null,
+        // Only meaningful while they are away; a teacher at their desk has already returned.
+        returnInMinutes: status === "DESK" ? null : minutesUntil(t.returnAt),
+      };
     });
-    const live = sessions.filter((s) => s.isLive);
+
+    /*
+     * One card per class the school runs, not one per timetable row. A regular class is a
+     * level — "Pre-Primary-A", "Class 3" — whose *current class* is whichever of its subjects
+     * is live; a special course is its own card. That grouping is what makes the board read
+     * as a corridor of rooms rather than a dump of the schedule table.
+     */
+    type Group = {
+      key: string;
+      label: string;
+      classLevel: string | null;
+      courseSlug: string | null;
+      order: number;
+      sessions: Session[];
+    };
+    const groups = new Map<string, Group>();
+    for (const s of sessions) {
+      const regular = s.course.type === "REGULAR" && s.classLevel;
+      const key = regular ? `level:${s.classLevel}` : `course:${s.course.slug}`;
+      let g = groups.get(key);
+      if (!g) {
+        g = {
+          key,
+          label: regular ? s.classLevel! : s.course.name,
+          classLevel: regular ? s.classLevel : null,
+          courseSlug: regular ? null : s.course.slug,
+          // Regular levels first, then the special courses, matching the printed board.
+          order: regular ? s.course.displayOrder : 1000 + s.course.displayOrder,
+          sessions: [],
+        };
+        groups.set(key, g);
+      }
+      g.sessions.push(s);
+    }
+
+    const classes = [...groups.values()]
+      .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
+      .map((g) => {
+        const live = g.sessions.find((s) => s.isLive) ?? null;
+        return {
+          key: g.key,
+          label: g.label,
+          classLevel: g.classLevel,
+          courseSlug: g.courseSlug,
+          live: Boolean(live),
+          currentCourseName: live?.course.name ?? null,
+          teacherName: live?.teacher?.user.name ?? null,
+          durationMinutes: live ? minutesSince(live.liveSince) : null,
+          attendees: live ? live._count.enrollments : null,
+        };
+      });
+
+    const liveCount = sessions.filter((s) => s.isLive).length;
     return {
-      open: live.length > 0,
-      liveCount: live.length,
-      sessions: live.map((s) => ({
-        id: s.id,
-        title: s.title,
-        courseName: s.course.name,
-        classLevel: s.classLevel,
-        teacherName: s.teacher?.user.name ?? null,
-        students: s._count.enrollments,
-      })),
+      open: liveCount > 0,
+      liveCount,
+      availableTeachers: desks.filter((d) => d.status === "DESK").length,
+      inClassTeachers: desks.filter((d) => d.status === "IN_CLASS").length,
+      desks,
+      classes,
     };
   }
 

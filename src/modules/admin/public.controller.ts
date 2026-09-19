@@ -40,8 +40,9 @@ export class PublicController {
   @Public() @Get("special-courses")
   specialCourses() { return this.admin.specialCourses(); }
 
-  @Public() @Get("campus-status")
-  campusStatus() { return this.admin.campusStatus(); }
+  /** Homepage office + classroom boards (LP-2, LP-3). */
+  @Public() @Get("school-board")
+  schoolBoard() { return this.admin.schoolBoard(); }
 
   @Public() @Get("hero-images")
   heroImages() { return this.admin.publicHeroImages(); }

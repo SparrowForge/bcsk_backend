@@ -10,6 +10,10 @@ const attendance = z.object({
   date: z.string().min(8),
   entries: z.array(z.object({ studentUserId: z.number().int(), status: z.string() })),
 });
+const deskStatusInput = z.object({
+  status: z.enum(["DESK", "OFFLINE"]),
+  returnAt: z.string().min(1).optional(),
+});
 const assignment = z.object({
   title: z.string().trim().min(1),
   description: z.string().optional(),
@@ -45,6 +49,13 @@ export class OfficeController {
   live(@Param("id") raw: string, @Body() body: unknown, @CurrentActor() a: Actor) {
     const { live, zoomLink } = z.object({ live: z.boolean(), zoomLink: z.string().optional() }).parse(body);
     return this.office.toggleLive(this.teacher(a), idParam.parse(raw), live, zoomLink);
+  }
+
+  /** The teacher's own desk presence on the homepage office board. */
+  @Patch("desk-status")
+  deskStatus(@Body() body: unknown, @CurrentActor() a: Actor) {
+    const { status, returnAt } = deskStatusInput.parse(body);
+    return this.office.setDeskStatus(this.teacher(a), status, returnAt ?? null);
   }
 
   @Post("classes/:id/attendance")

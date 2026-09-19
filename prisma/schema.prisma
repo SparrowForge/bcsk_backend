@@ -128,7 +128,13 @@ model TeacherProfile {
   photoUrl    String?
   guideClass  String? // guide-teacher class
   subjects    String? // comma-separated for display
-  isPublic    Boolean @default(true) // show on public Teachers page
+  isPublic    Boolean @default(true) // show on public Teachers page and the homepage office board
+  // Homepage office board (LP-2). `deskStatus` is what a teacher toggles about themselves;
+  // "in class" is never stored here - it is derived from owning a live ClassSession, so the
+  // office board can never contradict the classroom board.
+  deskName    String? // board label where one teacher holds a named desk: "English-1", "Quran-Female"
+  deskStatus  String  @default("OFFLINE") // DESK | OFFLINE
+  returnAt    DateTime? // when they expect to be back at the desk; null renders as "-"
   displayOrder Int    @default(100)
   user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   classSessions ClassSession[]
@@ -175,6 +181,7 @@ model ClassSession {
   teacherId    Int?
   zoomLink     String?
   isLive       Boolean @default(false)
+  liveSince    DateTime? // set when isLive flips on, cleared when it flips off - the board duration
   notice       String?
   active       Boolean @default(true)
   course       Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)

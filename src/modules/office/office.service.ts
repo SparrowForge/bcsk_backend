@@ -7,6 +7,9 @@ import type { Actor } from "../../common/actor";
 /** Attendance values are validated server-side, never trusted from a form. */
 const VALID_ATTENDANCE = ["PRESENT", "ABSENT", "LATE"];
 
+/** A teacher sets only these two about themselves; IN_CLASS is derived, never stored. */
+const VALID_DESK_STATUS = ["DESK", "OFFLINE"];
+
 /**
  * The teacher surface.
  *
@@ -108,11 +111,45 @@ export class OfficeService {
     return { classSession: cs, roster, assignments, videos, todayAttendance };
   }
 
+  /**
+   * `liveSince` is stamped here and nowhere else, so the homepage's "duration" is the time
+   * since a teacher actually started the class rather than the scheduled start. Re-pressing
+   * "go live" on a class that is already live must not restart that clock, which is why the
+   * timestamp is only written on the transition.
+   */
   async toggleLive(actor: Actor, classSessionId: number, live: boolean, zoomLink?: string) {
     const cs = await this.ownSession(actor, classSessionId);
+    const liveSince = live ? (cs.isLive ? cs.liveSince : new Date()) : null;
     return this.prisma.classSession.update({
       where: { id: cs.id },
-      data: { isLive: live, ...(zoomLink ? { zoomLink } : {}) },
+      data: { isLive: live, liveSince, ...(zoomLink ? { zoomLink } : {}) },
+    });
+  }
+
+  /**
+   * The teacher's own desk presence, shown on the homepage office board.
+   *
+   * A teacher may only set DESK or OFFLINE about themselves. "In class" is not settable and
+   * is not stored: the board derives it from owning a live session, so the two boards cannot
+   * disagree and a teacher cannot claim to be teaching a class they have not started.
+   */
+  async setDeskStatus(actor: Actor, status: string, returnAt: string | null) {
+    const profile = await this.prisma.teacherProfile.findUnique({ where: { userId: actor.userId } });
+    if (!profile) throw notFound("Teacher profile");
+    if (!VALID_DESK_STATUS.includes(status)) throw unprocessable("Choose a valid desk status.");
+
+    let back: Date | null = null;
+    if (returnAt) {
+      back = new Date(returnAt);
+      if (Number.isNaN(back.getTime())) throw unprocessable("Enter a valid return time.");
+      // A return time in the past would render as "back in 0 min" for ever.
+      if (back.getTime() < Date.now()) throw unprocessable("A return time must be in the future.");
+    }
+    return this.prisma.teacherProfile.update({
+      where: { id: profile.id },
+      // Sitting back down clears the return time; leaving it behind would show a stale
+      // "back in 20 min" beside a teacher who is already at their desk.
+      data: { deskStatus: status, returnAt: status === "DESK" ? null : back },
     });
   }
 
