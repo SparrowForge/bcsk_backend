@@ -629,7 +629,7 @@ export class AdminService {
    */
   private static readonly PUBLIC_SETTING_KEYS = [
     "stat_total_students", "stat_total_classes", "stat_special_courses", "stat_teachers_staff",
-    "whatsapp_number", "support_email", "school_phone", "school_phone2",
+    "whatsapp_number", "support_email", "school_phone", "school_phone2", "contact_hours",
     "bank_name", "bank_account_name", "bank_account_number",
     "semester_1_dates", "semester_2_dates",
     "school_time_weekday", "school_time_weekend",

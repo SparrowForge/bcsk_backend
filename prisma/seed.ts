@@ -38,6 +38,8 @@ async function main() {
     support_email: "bcskr22@gmail.com",
     school_phone: "+82 10-8948-3447",
     school_phone2: "+82 10-6893-6237",
+    // Printed beside the phone numbers in the footer; blank simply omits it.
+    contact_hours: "9AM – 10PM",
     bank_name: "Hana Bank",
     bank_account_name: "Bangladesh Community School Korea",
     bank_account_number: "298-910032-72304",
