@@ -40,6 +40,7 @@ async function main() {
     school_phone2: "+82 10-6893-6237",
     // Printed beside the phone numbers in the footer; blank simply omits it.
     contact_hours: "9AM – 10PM",
+    facebook_url: "https://www.facebook.com/bcskr",
     bank_name: "Hana Bank",
     bank_account_name: "Bangladesh Community School Korea",
     bank_account_number: "298-910032-72304",
