@@ -78,10 +78,9 @@ export class FileController {
     if (resolved.kind === "url") {
       // Redirect rather than proxy: the CDN serves the bytes, we only decide who may.
       //
-      // A token URL is a short-lived capability sitting in a Location header, so it must not
-      // be kept by a shared cache and handed to the next caller — who would then be reading
-      // someone else's receipt on our say-so. A public folder's URL carries no such secret.
-      res.setHeader("Cache-Control", resolved.expiring ? "no-store" : "private, max-age=300");
+      // `private` because the Location header is a delivery URL for a file this caller was
+      // authorised to read; a shared cache must not hand it to the next one.
+      res.setHeader("Cache-Control", "private, max-age=300");
       return res.redirect(302, resolved.url);
     }
     res.setHeader("Content-Type", resolved.mime);
