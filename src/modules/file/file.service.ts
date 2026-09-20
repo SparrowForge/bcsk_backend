@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import { v2 as cloudinary } from "cloudinary";
 import { PrismaService } from "../../database/prisma.service";
+import { intFromEnv } from "../../config/env";
 import { forbidden, notFound, unprocessable, misconfigured } from "../../common/errors/app-error";
 import { roleHas } from "../../common/permissions";
 import { log, errMessage } from "../../common/logger";
@@ -53,9 +54,32 @@ const POLICY: Record<string, Decision> = {
   "student-docs": ownerOnly(true),
 };
 
+/**
+ * Which folders get an expiring delivery URL.
+ *
+ * Derived from POLICY rather than listed again: a folder is sensitive exactly when reading
+ * it takes more than being awake, so a folder added later with a real policy gets expiring
+ * URLs without anyone remembering to add it here. An unknown folder counts as sensitive,
+ * which is unreachable through the controller — `authorise` has already refused it — and is
+ * the safe way round regardless.
+ *
+ * The public folders deliberately keep their permanent signed URL: a gallery photograph is
+ * public, and a URL that changes every request would miss the CDN cache on every request.
+ */
+function needsExpiringUrl(path: string): boolean {
+  const folder = path.split("/")[0] ?? "";
+  return POLICY[folder] !== "public";
+}
+
+/** A Cloudinary token key is hex; `Buffer.from(key, "hex")` truncates anything else silently. */
+const HEX_KEY = /^(?:[0-9a-f]{2})+$/i;
+
 @Injectable()
 export class FileService {
   private readonly configured: boolean;
+  /** Cloudinary token key (hex), or null when the account has no token-based delivery set up. */
+  private readonly tokenKey: string | null;
+  private readonly tokenTtl: number;
 
   constructor(private readonly prisma: PrismaService) {
     const cloud = process.env.CLOUDINARY_CLOUD_NAME?.trim();
@@ -64,6 +88,43 @@ export class FileService {
     this.configured = Boolean(cloud && key && secret);
     if (this.configured) {
       cloudinary.config({ cloud_name: cloud, api_key: key, api_secret: secret, secure: true });
+    }
+
+    const token = process.env.CLOUDINARY_TOKEN_KEY?.trim();
+    // A malformed key is worse than none: `Buffer.from(key, "hex")` accepts it, truncates at
+    // the first bad character, and mints tokens Cloudinary rejects — every sensitive file
+    // 401s in production while the logs say nothing. Refuse to boot instead (same rule the
+    // reCAPTCHA pair follows: configured or absent, never half).
+    if (token && !HEX_KEY.test(token)) {
+      throw new Error(
+        "CLOUDINARY_TOKEN_KEY must be the hexadecimal key from Cloudinary " +
+          "(Settings → Security → Token-based authentication), or left blank.",
+      );
+    }
+    this.tokenKey = token || null;
+    this.tokenTtl = intFromEnv("CLOUDINARY_TOKEN_TTL", 300);
+
+    // Fail closed at the loudest possible moment: if files live in Cloudinary, the key that
+    // gives the sensitive ones a lifetime is not optional. A failed boot is recoverable in a
+    // minute by setting one variable; the alternative — booting happily and handing out
+    // permanent links to receipts and ID documents — is not recoverable at all, because you
+    // cannot recall a URL someone already has. Same reasoning as JWT_SECRET (SEC-1).
+    //
+    // Scoped to `configured`: with no Cloudinary account at all, nothing is delivered by URL
+    // — every file is streamed from `FileBlob` — so there is nothing to protect and local
+    // development needs no key.
+    if (this.configured && !this.tokenKey) {
+      log.error("config", "cloudinary_token_key_missing", { effect: "refusing to start" });
+      throw new Error(
+        "CLOUDINARY_TOKEN_KEY is not set (or is blank) while Cloudinary is configured. " +
+          "Without it, files in the non-public folders (applications, receipts, submissions, " +
+          "student-docs, books, assignments, class-videos) could only be delivered by a signed " +
+          "URL that never expires. Take the hex key from Cloudinary → Settings → Security → " +
+          "Token-based authentication and set it in .env and in the hosting provider's " +
+          "environment variables. To run without Cloudinary entirely, leave " +
+          "CLOUDINARY_CLOUD_NAME / _API_KEY / _API_SECRET blank and files are served from the " +
+          "database instead.",
+      );
     }
   }
 
@@ -150,8 +211,30 @@ export class FileService {
   /**
    * Resolve a stored path to bytes or a signed URL.
    * A zero-length blob means the bytes are in Cloudinary.
+   *
+   * Two kinds of URL, chosen by `needsExpiringUrl`:
+   *
+   * - **Sensitive folders** (`applications`, `receipts`, `submissions`, `student-docs`, …)
+   *   get a token URL — `?__cld_token__=exp=…~hmac=…` — that Cloudinary's edge refuses once
+   *   `exp` passes. A leaked link is then worth `CLOUDINARY_TOKEN_TTL` seconds, not forever.
+   * - **Public folders** keep the plain signed URL, which is stable and therefore cacheable.
+   *
+   * Note what the signature alone does *not* do, since this was wrong here for a while and
+   * the comment claimed otherwise: `cloudinary.url()` signs the delivery path and nothing
+   * else, so `s--sig--` never expires. `expires_at` does not change that — it is read only by
+   * `private_download_url()` and the archive API, and this call dropped it silently. Expiry
+   * comes from the token or not at all, which is why the token key is the whole feature.
+   *
+   * `CLOUDINARY_TOKEN_KEY` is therefore not optional once Cloudinary is configured: the
+   * constructor refuses to start without it rather than let this method fall back to the
+   * permanent URL. A silent downgrade is exactly how the old `expires_at` bug survived —
+   * everything kept working, so nobody learned that a link to a receipt lasted forever.
    */
-  async resolve(path: string): Promise<{ kind: "bytes"; mime: string; data: Buffer } | { kind: "url"; url: string }> {
+  async resolve(
+    path: string,
+  ): Promise<
+    { kind: "bytes"; mime: string; data: Buffer } | { kind: "url"; url: string; expiring: boolean }
+  > {
     const blob = await this.prisma.fileBlob.findUnique({ where: { path } });
     if (!blob) throw notFound("File");
     if (blob.data.length > 0) {
@@ -161,13 +244,24 @@ export class FileService {
 
     const base = process.env.CLOUDINARY_FOLDER?.trim() || "bcsk";
     const publicId = `${base}/${path.replace(/\.[^.]+$/, "")}`;
+    const expiring = needsExpiringUrl(path);
+    const token = this.tokenKey;
+    if (expiring && !token) {
+      // The constructor makes this unreachable — it refuses to boot in exactly this state.
+      // Kept as the invariant it is: whatever happens upstream, the permanent signed URL is
+      // never the silent consolation prize for a sensitive file.
+      throw misconfigured("Secure file delivery is not configured.");
+    }
+    // `sign_url` stays on for both: with a token the SDK swaps `s--sig--` for the token, and
+    // on a public folder it is the only thing standing between the asset and a guess.
     const url = cloudinary.url(publicId, {
       type: "authenticated",
       resource_type: blob.mime === "application/pdf" ? "raw" : "image",
       sign_url: true,
-      // Short-lived: a leaked URL stops working rather than becoming a permanent hole.
-      expires_at: Math.floor(Date.now() / 1000) + 300,
-    } as Record<string, unknown>);
-    return { kind: "url", url };
+      ...(expiring && token ? { auth_token: { key: token, duration: this.tokenTtl } } : {}),
+    });
+    // `expiring` travels with the URL because the caller has to know it is handling a
+    // capability with a clock on it, not just a link.
+    return { kind: "url", url, expiring };
   }
 }
