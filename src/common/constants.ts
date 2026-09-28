@@ -82,6 +82,5 @@ export const SCHOOL = {
     accountName: "Bangladesh Community School Korea",
     accountNumber: "298-910032-72304",
   },
-  facebook: "https://www.facebook.com/bcskr",
-  youtube: "https://www.youtube.com/@bcskr",
+  facebook: "https://www.facebook.com/bcsk.edu",
 } as const;
