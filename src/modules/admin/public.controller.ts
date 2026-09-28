@@ -6,6 +6,7 @@ import { Public } from "../../common/decorators/actor.decorator";
 import { RateLimitService } from "../../common/rate-limit.service";
 import { verifyRecaptcha } from "../../common/recaptcha";
 import { unprocessable } from "../../common/errors/app-error";
+import { clientIp } from "../../common/client-ip";
 
 const contactSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -17,11 +18,6 @@ const contactSchema = z.object({
   recaptchaToken: z.string().optional(),
 });
 
-function clientIp(req: Request): string {
-  const fwd = req.headers["x-forwarded-for"];
-  if (typeof fwd === "string" && fwd) return fwd.split(",")[0]!.trim();
-  return req.ip ?? "unknown";
-}
 
 /**
  * Public reads that do not belong to the CMS module: curriculum, the student corner,

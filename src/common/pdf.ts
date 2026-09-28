@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
+import { verifyUrl } from "../config/web";
 
 const NAVY = "#1d2b64";
 const SKY = "#38a8dc";
@@ -28,13 +29,20 @@ function letterhead(doc: PDFKit.PDFDocument, title: string) {
   doc.moveTo(50, 138).lineTo(doc.page.width - 50, 138).lineWidth(1).strokeColor(SKY).stroke();
 }
 
+/** Today in Korea — the school's calendar, and the date the public verify page shows. */
+function seoulDate(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(d);
+}
+
 function footer(doc: PDFKit.PDFDocument, serial: string) {
-  const y = doc.page.height - 60;
+  const y = doc.page.height - 64;
+  const opts = { width: doc.page.width - 100, align: "center" as const };
+  // Used to print "Verify: bcskr.org" — the old Google Sites domain, which has no verify page.
+  // The link gets its own line: sharing one, it wrapped mid-URL and could not be retyped.
+  const url = verifyUrl(serial);
   doc.fontSize(8).fillColor(SOFT)
-    .text(`Document no: ${serial}  ·  Issued: ${new Date().toISOString().slice(0, 10)}  ·  Verify: bcskr.org`, 50, y, {
-      width: doc.page.width - 100,
-      align: "center",
-    });
+    .text(`Document no: ${serial}  ·  Issued: ${seoulDate()}`, 50, y, opts)
+    .text(url ? `Verify: ${url}` : "Verify this number on the BCSK website", opts);
 }
 
 /** FR-ADM-08: payment receipt PDF. */
@@ -120,7 +128,6 @@ export async function idCardPdf(data: {
   studentName: string;
   studentId: string;
   classLevel: string;
-  verifyUrl: string;
 }): Promise<Buffer> {
   // credit-card ratio at ~3x scale
   const W = 486, H = 306;
@@ -137,9 +144,15 @@ export async function idCardPdf(data: {
   doc.text(`Valid: ${new Date().getFullYear()} academic year`, 20, 168);
   doc.fontSize(8).fillColor(SOFT).text("If found, please return to BCSK · bcskr22@gmail.com", 20, H - 34, { width: 280 });
 
-  const qrPng = await QRCode.toBuffer(data.verifyUrl, { width: 240, margin: 1, color: { dark: NAVY } });
-  doc.image(qrPng, W - 140, 96, { width: 120, height: 120 });
-  doc.fontSize(7).fillColor(SOFT).text("Scan to verify", W - 140, 220, { width: 120, align: "center" });
+  const url = verifyUrl(data.serial);
+  if (url) {
+    const qrPng = await QRCode.toBuffer(url, { width: 240, margin: 1, color: { dark: NAVY } });
+    doc.image(qrPng, W - 140, 96, { width: 120, height: 120 });
+    doc.fontSize(7).fillColor(SOFT).text("Scan to verify", W - 140, 220, { width: 120, align: "center" });
+  } else {
+    // No public origin configured: a QR to a bare relative path scans as nothing, so print the number.
+    doc.fontSize(8).fillColor(SOFT).text(`Verify no. ${data.serial} on the BCSK website`, W - 150, 140, { width: 130, align: "center" });
+  }
   return docToBuffer(doc);
 }
 

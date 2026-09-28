@@ -35,6 +35,8 @@ export const regularApplicationSchema = z.object({
 export const specialApplicationSchema = z.object({
   ...shared,
   courseName: z.string().min(1),
+  /** The level or track within the course. Required when the course has levels. */
+  courseLevelId: z.coerce.number().int().positive().optional(),
   highestEducation: z.string().max(200).optional(),
   addressKorea: z.string().max(400).optional(),
   isBcskStudent: z.boolean().default(false),

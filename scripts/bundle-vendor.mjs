@@ -16,10 +16,11 @@ import fs from "node:fs";
 
 const backendRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const srcOutdir = path.join(backendRoot, "src", "vendor");
-// `nest build` wipes and recreates `dist/` on every run (deleteOutDir), and only copies
-// compiled `.ts` output there — a plain `.cjs` file placed here is never carried over on its
-// own. So this script also copies straight into `dist/src/vendor/`, and `npm run build` runs it
-// again *after* `nest build` to survive that wipe (see package.json).
+// Every `nest build` / `nest start` wipes `dist/` (deleteOutDir). nest-cli.json declares
+// `src/vendor/*.cjs` as assets, so the Nest CLI copies these files back into `dist/src/vendor/`
+// after that wipe — for `start` and `start:dev` (watch mode too) as well as `build`, which
+// previously crashed with "Cannot find module '../vendor/jose.cjs'" because only `build` re-ran
+// this script. The direct copy below is kept for `postinstall`, when `dist/` may already exist.
 const distOutdir = path.join(backendRoot, "dist", "src", "vendor");
 
 const targets = [

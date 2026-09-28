@@ -5,6 +5,7 @@ import { AdmissionService } from "./admission.service";
 import { regularApplicationSchema, specialApplicationSchema } from "./admission.schema";
 import { CurrentActor, Public, RequirePermission } from "../../common/decorators/actor.decorator";
 import type { Actor } from "../../common/actor";
+import { clientIp } from "../../common/client-ip";
 
 const idParam = z.coerce.number().int().positive();
 const pageQuery = z.object({
@@ -13,12 +14,6 @@ const pageQuery = z.object({
   status: z.string().optional(),
 });
 
-/** Best-effort client identity for rate limiting. */
-function clientIp(req: Request): string {
-  const fwd = req.headers["x-forwarded-for"];
-  if (typeof fwd === "string" && fwd) return fwd.split(",")[0]!.trim();
-  return req.ip ?? "unknown";
-}
 
 @Controller("admissions")
 export class AdmissionController {

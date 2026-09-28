@@ -164,6 +164,7 @@ model CourseLevel {
   workBookUrl  String?
   course       Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
   sessions     ClassSession[]
+  applications ApplicationForm[]
 
   @@index([courseId, displayOrder])
 }
@@ -296,6 +297,11 @@ model ApplicationForm {
   guardianPhone2   String?
   // special course
   courseName       String? // slug of special course
+  // The level or track the family chose (Abacus Level 2, Deen girls' Tajweed…). Activation
+  // enrols into this level's classes; without it every special-course student used to land
+  // in the course's first class. Null on applications made before the choice existed.
+  courseLevelId    Int?
+  courseLevel      CourseLevel? @relation(fields: [courseLevelId], references: [id], onDelete: SetNull)
   highestEducation String?
   // SEC-3: the BCSK-student discount claim, persisted at submit time. The fee is derived
   // from this column and never from a request parameter.

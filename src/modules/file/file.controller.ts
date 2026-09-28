@@ -7,6 +7,7 @@ import type { Request, Response } from "express";
 import { FileService } from "./file.service";
 import { Public } from "../../common/decorators/actor.decorator";
 import { RateLimitService } from "../../common/rate-limit.service";
+import { clientIp } from "../../common/client-ip";
 import { unprocessable, forbidden } from "../../common/errors/app-error";
 import type { Actor } from "../../common/actor";
 
@@ -50,8 +51,9 @@ export class FileController {
     const anonymousFolders = ["applications", "receipts"];
     if (!req.actor && !anonymousFolders.includes(folder)) throw forbidden();
 
-    const ip = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? req.ip ?? "unknown";
-    await this.rateLimit.consume("apply", ip);
+    // Its own bucket: a family uploads a photo *and* a receipt, and sharing the five-an-hour
+    // application allowance locked them out of paying after one corrected form.
+    await this.rateLimit.consume("upload", clientIp(req));
 
     const limits: Record<string, number> = {
       applications: 1024 * 1024,

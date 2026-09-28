@@ -13,6 +13,22 @@ export const krw = (n: number) => `₩${n.toLocaleString("en-US")}`;
 
 const OPEN_STATUSES = ["PENDING", "PENDING_VERIFICATION", "PAID", "VERIFIED"];
 
+/**
+ * Money arriving is not an admission decision. An application the office has refused, or sent
+ * back for corrections, must never become a student account just because its payment was
+ * verified — verification used to activate unconditionally, and a rejected applicant was
+ * silently flipped to APPROVED and emailed a login. Returns why activation is blocked, or null.
+ */
+export function activationBlockedReason(applicationStatus: string): string | null {
+  if (applicationStatus === "REJECTED") {
+    return "This application was rejected, so no student account was created. Refund the payment, or approve the application if the decision has changed.";
+  }
+  if (applicationStatus === "CORRECTIONS_REQUESTED") {
+    return "Corrections were requested on this application, so no student account was created yet. Approve it once the corrections are in.";
+  }
+  return null;
+}
+
 @Injectable()
 export class PaymentService {
   constructor(
@@ -82,6 +98,9 @@ export class PaymentService {
       include: { payments: true },
     });
     if (!app) throw notFound("Application");
+    if (app.status === "REJECTED") {
+      throw conflict("This application was not accepted, so it cannot be paid. Please contact the office.");
+    }
     return app;
   }
 
@@ -339,6 +358,8 @@ export class PaymentService {
   async activateEnrolment(applicationId: number): Promise<{ studentId: string }> {
     const app = await this.prisma.applicationForm.findUnique({ where: { id: applicationId } });
     if (!app) throw notFound("Application");
+    const blocked = activationBlockedReason(app.status);
+    if (blocked) throw conflict(blocked);
 
     if (app.createdStudentUserId) {
       const existing = await this.prisma.studentProfile.findFirst({
@@ -361,17 +382,27 @@ export class PaymentService {
         select: { id: true },
       });
       sessionIds = sessions.map((s) => s.id);
+    } else if (app.type === "SPECIAL" && app.courseLevelId) {
+      // Every class of the level the family chose. It used to be the course's first class,
+      // whatever was chosen — every Abacus student started in "Level 0 – Class 1".
+      const sessions = await this.prisma.classSession.findMany({
+        where: { courseLevelId: app.courseLevelId, semester: SEMESTER_CURRENT, active: true },
+        select: { id: true },
+      });
+      sessionIds = sessions.map((s) => s.id);
     } else if (app.type === "SPECIAL" && app.courseName) {
+      // An application from before the level choice existed. Enrol only when there is exactly
+      // one class, so there is nothing to guess; otherwise the office places the student.
       const course = await this.prisma.course.findUnique({ where: { slug: app.courseName } });
       if (course) {
-        const session = await this.prisma.classSession.findFirst({
+        const sessions = await this.prisma.classSession.findMany({
           where: { courseId: course.id, semester: SEMESTER_CURRENT, active: true },
-          orderBy: { id: "asc" },
           select: { id: true },
         });
-        if (session) sessionIds = [session.id];
+        if (sessions.length === 1) sessionIds = [sessions[0]!.id];
       }
     }
+    const unplaced = sessionIds.length === 0;
 
     const studentId = await this.prisma.$transaction(async (tx) => {
       const id = await this.nextStudentId(tx);
@@ -418,14 +449,25 @@ export class PaymentService {
         where: { applicationId: app.id, payerUserId: null },
         data: { payerUserId: user.id },
       });
-      await tx.applicationForm.update({
-        where: { id: app.id },
-        data: { status: "APPROVED", createdStudentUserId: user.id },
+      // Claim the application inside the transaction. The `createdStudentUserId` check above
+      // runs outside it, so a double click or two staff verifying at once could both pass it;
+      // the second claim now finds the row taken and rolls its whole account back.
+      const claimed = await tx.applicationForm.updateMany({
+        where: { id: app.id, createdStudentUserId: null },
+        data: {
+          status: "APPROVED",
+          createdStudentUserId: user.id,
+          ...(unplaced
+            ? { adminNote: [app.adminNote, "Activated without a class — no class this semester matched the chosen course/level. Place the student manually."].filter(Boolean).join(" · ") }
+            : {}),
+        },
       });
+      if (claimed.count === 0) throw conflict("This application has already been activated.");
       return id;
     });
 
     log.info("activation", "succeeded", { applicationId, studentId, enrolments: sessionIds.length });
+    if (unplaced) log.warn("activation", "no_class_placed", { applicationId, studentId, courseLevelId: app.courseLevelId });
 
     // Outside the transaction and non-fatal: an SMTP outage must not cost an enrolment.
     if (app.email) {

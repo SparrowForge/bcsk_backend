@@ -58,6 +58,16 @@ export class ClassroomService {
     if (!enrolled) throw forbidden("You are not enrolled in this class.");
     if (!text && !filePath) throw unprocessable("Attach a file or write your answer before submitting.");
 
+    // Once the teacher has graded it, the work is final. Replacing it used to keep the old grade
+    // and feedback attached to an answer the teacher had never seen.
+    const existing = await this.prisma.submission.findUnique({
+      where: { assignmentId_studentUserId: { assignmentId, studentUserId: actor.userId } },
+      select: { gradedAt: true },
+    });
+    if (existing?.gradedAt) {
+      throw conflict("This homework has already been graded, so it can't be changed. Ask your teacher if you need to resubmit.");
+    }
+
     return this.prisma.submission.upsert({
       where: { assignmentId_studentUserId: { assignmentId, studentUserId: actor.userId } },
       update: { fileUrl: filePath, text, submittedAt: new Date() },

@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit.service";
 import { MailService } from "../../common/mail.service";
-import { PaymentService } from "../payment/payment.service";
+import { PaymentService, activationBlockedReason } from "../payment/payment.service";
 import { SEMESTER_CURRENT, classLevelOrder } from "../../common/constants";
 import { conflict, notFound, unprocessable } from "../../common/errors/app-error";
 import { toPage, toPrismaPage, type PageRequest } from "../../common/pagination/cursor";
@@ -514,17 +514,21 @@ export class AdminService {
       include: { application: true, payer: { include: { studentProfile: true } } },
     });
     if (!payment) throw notFound("Payment");
-    if (payment.status !== "PENDING_VERIFICATION") {
+
+    // Conditional update, not check-then-write: two clicks (or two staff) must not both verify.
+    const claimed = await this.prisma.payment.updateMany({
+      where: { id: paymentId, status: "PENDING_VERIFICATION" },
+      data: { status: "VERIFIED", verifiedById: actor.userId, verifiedAt: new Date() },
+    });
+    if (claimed.count === 0) {
       throw conflict("Only a payment awaiting verification can be verified.");
     }
 
-    await this.prisma.payment.update({
-      where: { id: paymentId },
-      data: { status: "VERIFIED", verifiedById: actor.userId, verifiedAt: new Date() },
-    });
-
-    if (payment.applicationId) {
-      await this.payments.activateEnrolment(payment.applicationId);
+    // The money is recorded either way; whether it makes a student is the admission decision's call.
+    let notice: string | null = null;
+    if (payment.applicationId && payment.application) {
+      notice = activationBlockedReason(payment.application.status);
+      if (!notice) await this.payments.activateEnrolment(payment.applicationId);
     } else if (payment.payerUserId && payment.purpose === "RE_ADMISSION") {
       const student = await this.prisma.studentProfile.findUnique({
         where: { userId: payment.payerUserId },
@@ -560,9 +564,12 @@ export class AdminService {
       }
     }
 
-    await this.audit.record(actor.userId, "PAYMENT_VERIFY", "Payment", paymentId, `verified ${payment.amount}`);
-    log.info("payment", "verified_by_staff", { paymentId, by: actor.loginId });
-    return { paymentId, status: "VERIFIED" };
+    await this.audit.record(
+      actor.userId, "PAYMENT_VERIFY", "Payment", paymentId,
+      `verified ${payment.amount}${notice ? " (no activation: application not accepted)" : ""}`,
+    );
+    log.info("payment", "verified_by_staff", { paymentId, by: actor.loginId, activated: !notice });
+    return { paymentId, status: "VERIFIED", activated: !notice, notice };
   }
 
   async rejectPayment(paymentId: number, reason: string, actor: Actor) {
@@ -580,8 +587,14 @@ export class AdminService {
       data: { status: "REJECTED", rejectReason: reason, verifiedById: actor.userId, verifiedAt: new Date() },
     });
     if (payment.applicationId) {
-      await this.prisma.applicationForm.update({
-        where: { id: payment.applicationId },
+      // A bad receipt sends a *live* application back for correction. It must not reopen one
+      // the office already rejected, or touch one that is already an enrolled student.
+      await this.prisma.applicationForm.updateMany({
+        where: {
+          id: payment.applicationId,
+          status: { notIn: ["REJECTED", "APPROVED"] },
+          createdStudentUserId: null,
+        },
         data: { status: "CORRECTIONS_REQUESTED", correctionNote: reason },
       });
     }
@@ -805,6 +818,8 @@ export class AdminService {
     return this.prisma.course.findMany({
       where: { type: "SPECIAL", active: true },
       orderBy: { displayOrder: "asc" },
+      // The application form asks for a level or track; only the id and label are public.
+      include: { levels: { select: { id: true, name: true }, orderBy: { displayOrder: "asc" } } },
     });
   }
 

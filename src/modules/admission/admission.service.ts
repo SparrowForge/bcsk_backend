@@ -4,7 +4,7 @@ import { AuditService } from "../../common/audit.service";
 import { MailService } from "../../common/mail.service";
 import { RateLimitService } from "../../common/rate-limit.service";
 import { verifyRecaptcha } from "../../common/recaptcha";
-import { notFound, unprocessable } from "../../common/errors/app-error";
+import { conflict, notFound, unprocessable } from "../../common/errors/app-error";
 import { toPage, toPrismaPage, type PageRequest } from "../../common/pagination/cursor";
 import { log } from "../../common/logger";
 import { issuePaymentToken, assertPaymentToken } from "../payment/payment-token";
@@ -14,6 +14,11 @@ import type { RegularApplicationInput, SpecialApplicationInput } from "./admissi
 
 /** GAP-12: the specification restricts admission to children aged 5 and above. */
 const MINIMUM_AGE_YEARS = 5;
+
+/** Applicant-supplied and staff-written text both reach HTML email bodies. */
+function escapeHtml(v: string): string {
+  return v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
 function ageOn(dob: Date, on = new Date()): number {
   let age = on.getFullYear() - dob.getFullYear();
@@ -87,6 +92,18 @@ export class AdmissionService {
     if (!captcha.ok) throw unprocessable("Captcha verification failed. Please try again.");
     const dob = this.assertEligible(input.dob);
 
+    // The course used to be stored as whatever string arrived. Check it is a real, open special
+    // course, and that the chosen level belongs to it — activation enrols into that level.
+    const course = await this.prisma.course.findFirst({
+      where: { slug: input.courseName, type: "SPECIAL", active: true },
+      include: { levels: { select: { id: true } } },
+    });
+    if (!course) throw unprocessable("Choose one of the listed courses.");
+    const hasLevels = course.levels.length > 0;
+    if (hasLevels && !course.levels.some((l) => l.id === input.courseLevelId)) {
+      throw unprocessable("Choose a level or track for this course.");
+    }
+
     const app = await this.prisma.applicationForm.create({
       data: {
         type: "SPECIAL",
@@ -101,6 +118,7 @@ export class AdmissionService {
         addressBangladesh: input.addressBangladesh,
         emergencyContact: input.emergencyContact,
         courseName: input.courseName,
+        courseLevelId: hasLevels ? input.courseLevelId : null,
         highestEducation: input.highestEducation || null,
         parentalConsent: true,
         // SEC-3: the discount claim is persisted here and is the only source the fee
@@ -151,7 +169,7 @@ export class AdmissionService {
   async getForStaff(id: number) {
     const app = await this.prisma.applicationForm.findUnique({
       where: { id },
-      include: { payments: true },
+      include: { payments: true, courseLevel: { select: { id: true, name: true } } },
     });
     if (!app) throw notFound("Application");
     return app;
@@ -164,10 +182,12 @@ export class AdmissionService {
     });
     if (!app) throw notFound("Application");
 
+    // Record the decision first. It is what lets activation proceed — including when the office
+    // approves an application it had earlier rejected — and it must stand even if the payment
+    // has not been verified yet, in which case verifying it later creates the account.
+    await this.prisma.applicationForm.update({ where: { id }, data: { status: "APPROVED" } });
     const paid = app.payments.some((p) => ["PAID", "VERIFIED"].includes(p.status));
-    const result = paid
-      ? await this.payments.activateEnrolment(id)
-      : (await this.prisma.applicationForm.update({ where: { id }, data: { status: "APPROVED" } }), { studentId: null });
+    const result = paid ? await this.payments.activateEnrolment(id) : { studentId: null };
 
     await this.audit.record(actor.userId, "ADMISSION_DECISION", "ApplicationForm", id, "approved");
     return { applicationId: id, activated: paid, ...result };
@@ -186,15 +206,13 @@ export class AdmissionService {
       data: { status: "CORRECTIONS_REQUESTED", correctionNote: note },
     });
     if (app.email) {
-      // The note is staff-written but still reaches an HTML email body.
-      const escape = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       await this.mail.send(
         app.email,
         "BCSK application - correction needed",
         this.mail.layout(
           "One more step",
-          `<p style="font-size:14px;color:#232323">Your application for <b>${escape(app.applicantName)}</b> needs a small correction before we can proceed:</p>
-           <p style="font-size:14px;color:#232323;background:#fbf6ea;border-radius:8px;padding:12px">${escape(note)}</p>
+          `<p style="font-size:14px;color:#232323">Your application for <b>${escapeHtml(app.applicantName)}</b> needs a small correction before we can proceed:</p>
+           <p style="font-size:14px;color:#232323;background:#fbf6ea;border-radius:8px;padding:12px">${escapeHtml(note)}</p>
            <p style="font-size:14px;color:#232323">Reply to this email or contact the office with the corrected information.</p>`,
         ),
       );
@@ -204,6 +222,12 @@ export class AdmissionService {
   }
 
   async reject(id: number, reason: string, actor: Actor) {
+    const existing = await this.prisma.applicationForm.findUnique({ where: { id } });
+    if (!existing) throw notFound("Application");
+    if (existing.createdStudentUserId) {
+      // Rejecting now would leave an active student account behind a "rejected" label.
+      throw conflict("This applicant is already an enrolled student. Withdraw the student instead of rejecting the application.");
+    }
     const app = await this.prisma.applicationForm.update({
       where: { id },
       data: { status: "REJECTED", adminNote: reason },
@@ -214,8 +238,8 @@ export class AdmissionService {
         "BCSK application update",
         this.mail.layout(
           "About your application",
-          `<p style="font-size:14px;color:#232323">We are sorry - the application for <b>${app.applicantName}</b> could not be accepted.</p>
-           <p style="font-size:14px;color:#232323"><b>Reason:</b> ${reason}</p>`,
+          `<p style="font-size:14px;color:#232323">We are sorry - the application for <b>${escapeHtml(app.applicantName)}</b> could not be accepted.</p>
+           <p style="font-size:14px;color:#232323"><b>Reason:</b> ${escapeHtml(reason)}</p>`,
         ),
       );
     }
