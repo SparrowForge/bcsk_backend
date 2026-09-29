@@ -281,6 +281,24 @@ Enrolled students can download the detailed syllabus for each of their subjects 
 Special course syllabi (Abacus levels 0–7, IELTS levels 1–9, Deen tracks) are listed on each course page.`,
   },
   {
+    // The Academic menu links here; without a seeded page a fresh install served a 404.
+    // Wording is the school's own, as published on the live site.
+    slug: "class-schedule",
+    lang: "en",
+    title: "Class Schedule",
+    content: `## Weekly Schedule
+
+**Saturday**
+
+10:00 AM – 4:00 PM, as per the term routine.
+
+**Weekdays**
+
+Afternoon/Evening, 6:30 PM – 9:00 PM. Exact timing varies by class.
+
+Individual class-by-class timing is confirmed with your child's teacher after enrolment; the windows above are the standing weekly schedule.`,
+  },
+  {
     slug: "academic-calendar",
     lang: "en",
     title: "Academic Calendar",
