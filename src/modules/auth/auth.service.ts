@@ -38,10 +38,14 @@ export class AuthService {
     private readonly rateLimit: RateLimitService,
   ) {}
 
-  /** Where the emailed link points. Blank falls back to the first CORS origin. */
+  /**
+   * Where the emailed link points: `APP_BASE_URL`, else the first non-localhost CORS origin
+   * (so a deploy missing the variable never emails a localhost link), else localhost for dev.
+   */
   private appBaseUrl(): string {
-    const first = (process.env.CORS_ORIGINS ?? "").split(",")[0]?.trim() ?? "";
-    return strFromEnv("APP_BASE_URL", first || "http://localhost:3000").replace(/\/+$/, "");
+    const origins = (process.env.APP_BASE_URL ?? "").split(",").map((o) => o.trim()).filter(Boolean);
+    const real = origins.find((o) => !/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(o));
+    return strFromEnv("APP_BASE_URL", real ?? origins[0] ?? "http://localhost:3000").replace(/\/+$/, "");
   }
 
   /**
@@ -81,7 +85,7 @@ export class AuthService {
     const body = links
       .map(
         (l) =>
-          `<p style="font-size:14px;color:#232323">Account <b>${l.loginId}</b>:<br><a href="${l.url}" style="color:#1d2b64">Set a new password</a></p>`,
+          `<p style="font-size:14px;color:#232323">Account <b>${l.loginId}</b>:<br><a href="${l.url}" style="color:#1d2b64">Set a new password</a><br><span style="font-size:12px;color:#5b5b6b;word-break:break-all">${l.url}</span></p>`,
       )
       .join("");
     const { simulated } = await this.mail.send(
