@@ -2,8 +2,12 @@ import { Injectable } from "@nestjs/common";
 import type { Request } from "express";
 import bcrypt from "bcryptjs";
 import { PrismaService } from "../../database/prisma.service";
-import { requiredSecret, intFromEnv } from "../../config/env";
+import { createHash, randomBytes } from "node:crypto";
+import { requiredSecret, intFromEnv, strFromEnv } from "../../config/env";
 import { log } from "../../common/logger";
+import { MailService } from "../../common/mail.service";
+import { RateLimitService } from "../../common/rate-limit.service";
+import { unprocessable } from "../../common/errors/app-error";
 import { SignJWT, jwtVerify } from "../../common/jose";
 import type { Role } from "../../common/constants";
 import type { Actor, ActorTransport } from "../../common/actor";
@@ -20,12 +24,103 @@ import type { Actor, ActorTransport } from "../../common/actor";
  */
 export const SESSION_COOKIE = "bcsk_session";
 
+const RESET_TTL_MS = 60 * 60 * 1000;
+const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
+
 @Injectable()
 export class AuthService {
   private readonly secret = new TextEncoder().encode(requiredSecret("JWT_SECRET"));
   private readonly sessionHours = intFromEnv("SESSION_HOURS", 8);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+    private readonly rateLimit: RateLimitService,
+  ) {}
+
+  /** Where the emailed link points. Blank falls back to the first CORS origin. */
+  private appBaseUrl(): string {
+    const first = (process.env.CORS_ORIGINS ?? "").split(",")[0]?.trim() ?? "";
+    return strFromEnv("APP_BASE_URL", first || "http://localhost:3000").replace(/\/+$/, "");
+  }
+
+  /**
+   * Email a one-hour reset link. `identifier` is a login ID or an email address; the same
+   * email can belong to several children, so each matching account gets its own link.
+   *
+   * Always resolves the same way whether or not anything matched, so the endpoint cannot be
+   * used to discover which IDs or addresses are registered. Only the SHA-256 of the token is
+   * stored — a database leak must not yield usable links.
+   */
+  async requestPasswordReset(identifier: string, ip: string): Promise<void> {
+    await this.rateLimit.consume("passwordReset", ip);
+    await this.rateLimit.consume("passwordReset", `id:${identifier.toLowerCase()}`);
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        active: true,
+        email: { not: null },
+        OR: [{ loginId: identifier }, { email: { equals: identifier, mode: "insensitive" } }],
+      },
+      take: 5,
+    });
+    if (users.length === 0) {
+      log.info("auth", "password_reset_no_match", { identifier });
+      return;
+    }
+
+    const links: { loginId: string; url: string }[] = [];
+    for (const u of users) {
+      const token = randomBytes(32).toString("base64url");
+      await this.prisma.passwordReset.create({
+        data: { userId: u.id, token: hashToken(token), expiresAt: new Date(Date.now() + RESET_TTL_MS) },
+      });
+      links.push({ loginId: u.loginId, url: `${this.appBaseUrl()}/reset-password?token=${token}` });
+    }
+
+    const body = links
+      .map(
+        (l) =>
+          `<p style="font-size:14px;color:#232323">Account <b>${l.loginId}</b>:<br><a href="${l.url}" style="color:#1d2b64">Set a new password</a></p>`,
+      )
+      .join("");
+    const { simulated } = await this.mail.send(
+      users[0]!.email!,
+      "Reset your BCSK password",
+      this.mail.layout(
+        "Reset your password",
+        `${body}<p style="font-size:12px;color:#5b5b6b">These links work once and expire in one hour. If you did not ask for this, ignore this email — your password has not changed.</p>`,
+      ),
+    );
+    log.info("auth", "password_reset_requested", { accounts: users.map((u) => u.loginId).join(","), emailSimulated: simulated });
+  }
+
+  /** Consume a reset token and set the new password. */
+  async completePasswordReset(token: string, newPassword: string): Promise<void> {
+    const row = await this.prisma.passwordReset.findUnique({ where: { token: hashToken(token) } });
+    if (!row || row.usedAt || row.expiresAt < new Date()) {
+      throw unprocessable("This reset link is invalid or has expired. Request a new one.");
+    }
+    const hash = await bcrypt.hash(newPassword, 12);
+    const now = new Date();
+    // The conditional updateMany makes the token single-use even under concurrent requests.
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.passwordReset.updateMany({
+        where: { id: row.id, usedAt: null },
+        data: { usedAt: now },
+      });
+      if (count === 0) return false;
+      await tx.user.update({
+        where: { id: row.userId },
+        data: { passwordHash: hash, mustChangePassword: false, passwordChangedAt: now },
+      });
+      await tx.passwordReset.updateMany({ where: { userId: row.userId, usedAt: null }, data: { usedAt: now } });
+      await tx.refreshToken.updateMany({ where: { userId: row.userId, revokedAt: null }, data: { revokedAt: now } });
+      return true;
+    });
+    if (!claimed) throw unprocessable("This reset link is invalid or has expired. Request a new one.");
+    log.info("auth", "password_reset_completed", { userId: row.userId });
+  }
 
   /** Look up a user for token refresh. */
   async userById(id: number) {

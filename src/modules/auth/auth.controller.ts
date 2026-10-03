@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Post, Res } from "@nestjs/common";
-import type { Response } from "express";
+import { Body, Controller, Get, Post, Req, Res } from "@nestjs/common";
+import type { Request, Response } from "express";
+import { clientIp } from "../../common/client-ip";
 import { z } from "zod";
 import { AuthService, SESSION_COOKIE } from "./auth.service";
 import { RefreshTokenService } from "./refresh-token.service";
@@ -95,6 +96,25 @@ export class AuthController {
         name: user.name, mustChangePassword: user.mustChangePassword,
       },
     };
+  }
+
+  /** Always `{ ok: true }` — never reveals whether the ID or email exists. */
+  @Public()
+  @Post("forgot-password")
+  async forgotPassword(@Body() body: unknown, @Req() req: Request) {
+    const { identifier } = z.object({ identifier: z.string().trim().min(1).max(254) }).parse(body);
+    await this.auth.requestPasswordReset(identifier, clientIp(req));
+    return { ok: true };
+  }
+
+  @Public()
+  @Post("reset-password")
+  async resetPassword(@Body() body: unknown) {
+    const { token, password } = z
+      .object({ token: z.string().min(1).max(200), password: z.string().min(10, "Use at least 10 characters.").max(200) })
+      .parse(body);
+    await this.auth.completePasswordReset(token, password);
+    return { ok: true };
   }
 
   @Post("logout")
