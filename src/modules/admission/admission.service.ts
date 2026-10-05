@@ -9,10 +9,12 @@ import { toPage, toPrismaPage, type PageRequest } from "../../common/pagination/
 import { log } from "../../common/logger";
 import { issuePaymentToken, assertPaymentToken } from "../payment/payment-token";
 import { PaymentService } from "../payment/payment.service";
+import { CouponService } from "../coupon/coupon.service";
+import { discountFor, describeDiscount, normalizeCode } from "../coupon/coupon.rules";
 import type { Actor } from "../../common/actor";
 import { Prisma } from "@prisma/client";
 import { SEMESTER_CURRENT } from "../../common/constants";
-import type { ApplicationInput } from "./admission.schema";
+import type { ApplicationInput, CouponCheck } from "./admission.schema";
 
 type FeePreviewQuery = { type: string; grade?: string; courseName?: string; courseLevelId?: number };
 
@@ -39,6 +41,7 @@ export class AdmissionService {
     private readonly mail: MailService,
     private readonly rateLimit: RateLimitService,
     private readonly payments: PaymentService,
+    private readonly coupons: CouponService,
   ) {}
 
   private assertEligible(dobRaw: string): Date {
@@ -122,9 +125,42 @@ export class AdmissionService {
       }
     }
 
+    // The coupon is checked and copied onto the application here; payment reads only the copy.
+    if (input.couponCode) {
+      const coupon = await this.coupons.resolve(input.couponCode, input.type);
+      data.coupon = { connect: { id: coupon.id } };
+      data.couponCode = coupon.code;
+      data.couponType = coupon.discountType;
+      data.couponValue = coupon.value;
+    }
+
     const app = await this.prisma.applicationForm.create({ data });
     log.info("activation", "application_submitted", { applicationId: app.id, type: input.type });
     return this.issued(app.id);
+  }
+
+  /**
+   * What a coupon would take off, shown on the form before submitting. The same resolve and
+   * arithmetic the real submit and the payment step use, so the preview cannot disagree with
+   * the charge. A bad code is an error; a good one reports a discount for every fee option.
+   */
+  async couponCheck(input: CouponCheck, ip: string) {
+    await this.rateLimit.consume("coupon", ip);
+    const coupon = await this.coupons.resolve(input.code, input.type);
+    const fees = await this.payments.feeStructure({
+      type: input.type,
+      courseName: input.courseName,
+      courseLevelId: input.courseLevelId,
+    });
+    return {
+      code: normalizeCode(coupon.code),
+      label: describeDiscount(coupon.discountType, coupon.value),
+      description: coupon.description,
+      options: fees.options.map((o) => {
+        const discount = discountFor(o.total, coupon.discountType, coupon.value);
+        return { key: o.key, discount, payable: o.total - discount };
+      }),
+    };
   }
 
   /** A class of the Regular Course, by level id or (older callers) by its grade code. */

@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { z } from "zod";
 import { AdmissionService } from "./admission.service";
-import { applicationSchema, feePreviewSchema } from "./admission.schema";
+import { applicationSchema, couponCheckSchema, feePreviewSchema } from "./admission.schema";
 import { CurrentActor, Public, RequirePermission } from "../../common/decorators/actor.decorator";
 import type { Actor } from "../../common/actor";
 import { clientIp } from "../../common/client-ip";
@@ -46,6 +46,13 @@ export class AdmissionController {
   @Get("fee-preview")
   feePreview(@Query() query: unknown) {
     return this.admissions.feePreview(feePreviewSchema.parse(query));
+  }
+
+  /** Does this coupon work for this registration, and what would it take off? Rate limited per visitor. */
+  @Public()
+  @Post("coupon-check")
+  couponCheck(@Body() body: unknown, @Req() req: Request) {
+    return this.admissions.couponCheck(couponCheckSchema.parse(body), clientIp(req));
   }
 
   @Public()

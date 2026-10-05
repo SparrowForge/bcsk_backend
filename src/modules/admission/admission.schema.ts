@@ -23,6 +23,8 @@ const common = {
   /** GAP-11: the specification asks for this and the old form omitted it. */
   learningMode: z.enum(["online", "hybrid"]).optional(),
   idDocumentPath: z.string().optional(),
+  /** Optional discount coupon. Validated and snapshotted on the application at submit. */
+  couponCode: z.string().trim().max(40).optional(),
 };
 
 const guardian = {
@@ -75,9 +77,18 @@ const reAdmission = z.object({
 export const applicationSchema = z.discriminatedUnion("type", [regular, special, reAdmission]);
 
 export type ApplicationInput = z.infer<typeof applicationSchema>;
+export type CouponCheck = z.infer<typeof couponCheckSchema>;
 export type ApplicationType = ApplicationInput["type"];
 
 /** What the form asks the server to price. Display only - the charge is recomputed at payment. */
+/** A coupon check from the form: which registration, and which class or course, it would apply to. */
+export const couponCheckSchema = z.object({
+  code: z.string().trim().min(1).max(40),
+  type: z.enum(["REGULAR", "SPECIAL", "RE_ADMISSION"]),
+  courseName: z.string().optional(),
+  courseLevelId: z.coerce.number().int().positive().optional(),
+});
+
 export const feePreviewSchema = z.object({
   type: z.enum(["REGULAR", "SPECIAL", "RE_ADMISSION"]),
   grade: z.string().optional(),

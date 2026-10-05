@@ -28,6 +28,7 @@ export const PERMISSIONS = [
   "tickets:manage",
   "leads:read", // CRM: view leads, pipeline, follow-ups, reports
   "leads:manage", // CRM: create/edit leads, move stages, assign, convert, manage sources
+  "coupons:manage", // discount coupons for the admission form
   "users:manage",
   "settings:manage",
   "audit:read",
@@ -51,6 +52,7 @@ const ADMIN_SUPPORT_PERMISSIONS: Permission[] = [
   "tickets:manage",
   "leads:read",
   "leads:manage",
+  "coupons:manage",
 ];
 
 /** IT support: accounts and the support queue. Deliberately no money, no admissions. */
@@ -81,6 +83,7 @@ export const ADMIN_NAV: { href: string; label: string; permission: Permission | 
   { href: "/admin/admissions", label: "Admissions", permission: "admissions:read" },
   { href: "/admin/leads", label: "CRM Leads", permission: "leads:read" },
   { href: "/admin/payments", label: "Payments", permission: "payments:read" },
+  { href: "/admin/coupons", label: "Coupons", permission: "coupons:manage" },
   { href: "/admin/fees", label: "Fee Configuration", permission: "fees:manage" },
   { href: "/admin/cms", label: "CMS Pages", permission: "content:manage" },
   { href: "/admin/news", label: "News & Events", permission: "content:manage" },

@@ -8,6 +8,7 @@ import { SEMESTER_CURRENT } from "../../common/constants";
 import { log, errMessage } from "../../common/logger";
 import { conflict, misconfigured, notFound, upstreamFailed } from "../../common/errors/app-error";
 import { assertPaymentToken } from "./payment-token";
+import { describeDiscount, discountFor } from "../coupon/coupon.rules";
 
 export const krw = (n: number) => `₩${n.toLocaleString("en-US")}`;
 
@@ -74,7 +75,11 @@ export class PaymentService {
     return this.prisma.feeConfig.findUnique({ where: { key } });
   }
 
-  async computeFee(app: {
+  /**
+   * The fee before any coupon. Split out so `computeFee` can apply the stored coupon to it and
+   * the application form's preview can show the same arithmetic.
+   */
+  private async baseFee(app: {
     type: string;
     grade: string | null;
     courseName: string | null;
@@ -104,6 +109,31 @@ export class PaymentService {
     return {
       amount: fee.admissionFee + course,
       breakdown: `Admission fee ${krw(fee.admissionFee)} + Course fee ${krw(course)} (${isBcsk ? "BCSK" : "non-BCSK"} student rate)`,
+    };
+  }
+
+  /**
+   * What the family pays: the base fee less the coupon stored on the application. The coupon
+   * comes from the persisted snapshot columns only (SEC-3) - there is no argument to override it.
+   */
+  async computeFee(app: {
+    type: string;
+    grade: string | null;
+    courseName: string | null;
+    courseLevelId?: number | null;
+    isBcskStudent?: boolean;
+    couponCode?: string | null;
+    couponType?: string | null;
+    couponValue?: number | null;
+  }): Promise<{ amount: number; breakdown: string; subtotal: number; discount: number }> {
+    const base = await this.baseFee(app);
+    const discount = discountFor(base.amount, app.couponType, app.couponValue);
+    if (discount === 0) return { ...base, subtotal: base.amount, discount: 0 };
+    return {
+      amount: base.amount - discount,
+      subtotal: base.amount,
+      discount,
+      breakdown: `${base.breakdown} - Coupon ${app.couponCode ?? ""} (${describeDiscount(app.couponType!, app.couponValue!)}) -${krw(discount)}`,
     };
   }
 

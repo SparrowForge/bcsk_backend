@@ -20,6 +20,7 @@ import { OfficeModule } from "./modules/office/office.module";
 import { DocumentModule } from "./modules/document/document.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { LeadsModule } from "./modules/leads/leads.module";
+import { CouponModule } from "./modules/coupon/coupon.module";
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { LeadsModule } from "./modules/leads/leads.module";
     DocumentModule,
     AdminModule,
     LeadsModule,
+    CouponModule,
     HealthModule,
   ],
   providers: [

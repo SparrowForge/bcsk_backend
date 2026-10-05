@@ -325,6 +325,14 @@ model ApplicationForm {
   updatedAt        DateTime @updatedAt
   payments         Payment[]
   leads            Lead[]
+  // Discount coupon, snapshotted at submit time. The payable amount is derived from these
+  // columns and never from a request (SEC-3): editing or deleting the Coupon later does not
+  // change what a family already holds.
+  couponId         Int?
+  coupon           Coupon?  @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCode       String?
+  couponType       String? // PERCENT | FIXED
+  couponValue      Int? // percent (1-99) or KRW amount
 
   @@index([status, createdAt])
   @@index([type, createdAt])
@@ -723,4 +731,25 @@ model LeadActivity {
 
   @@index([leadId])
   @@index([scheduledAt])
+}
+
+/**
+ * Discount coupon, redeemed on the admission form. `PERCENT` takes `value` percent off the
+ * fee total; `FIXED` takes `value` won off it. Books are not part of the total, so are not
+ * discounted. Codes are stored upper-case.
+ */
+model Coupon {
+  id           Int       @id @default(autoincrement())
+  code         String    @unique
+  description  String?
+  discountType String // PERCENT | FIXED
+  value        Int
+  appliesTo    String    @default("ALL") // ALL | REGULAR | SPECIAL | RE_ADMISSION
+  maxUses      Int? // null = unlimited; counted over applications that have not been rejected
+  validFrom    DateTime?
+  validUntil   DateTime?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  applications ApplicationForm[]
 }
