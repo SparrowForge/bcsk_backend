@@ -87,7 +87,7 @@ describe("environment secrets fail loud (SEC-1, carried across the split)", () =
 });
 
 describe("permission model survived the port to NestJS (risk R1)", () => {
-  it.each(["payments:verify", "payments:refund", "admissions:decide", "content:manage"] as const)(
+  it.each(["payments:verify", "payments:refund", "admissions:decide", "cms:manage"] as const)(
     "IT_SUPPORT is denied %s",
     (p) => expect(roleHas("IT_SUPPORT", p)).toBe(false),
   );

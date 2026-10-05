@@ -18,15 +18,15 @@ export class AdminController {
 
   /* --------------------------------- CMS ---------------------------------- */
 
-  @RequirePermission("content:manage") @Get("pages")
+  @RequirePermission("cms:manage") @Get("pages")
   listPages() { return this.admin.listPages(); }
 
-  @RequirePermission("content:manage") @Get("pages/:slug/:lang")
+  @RequirePermission("cms:manage") @Get("pages/:slug/:lang")
   getPage(@Param("slug") slug: string, @Param("lang") lang: string) {
     return this.admin.getPage(slug, lang);
   }
 
-  @RequirePermission("content:manage") @Post("pages")
+  @RequirePermission("cms:manage") @Post("pages")
   savePage(@Body() body: unknown, @CurrentActor() a: Actor) {
     const input = z.object({
       slug: z.string(), lang: z.string(), title: z.string(),
@@ -35,17 +35,17 @@ export class AdminController {
     return this.admin.savePage(input, a);
   }
 
-  @RequirePermission("content:manage") @Delete("pages/:slug/:lang")
+  @RequirePermission("cms:manage") @Delete("pages/:slug/:lang")
   deletePage(@Param("slug") slug: string, @Param("lang") lang: string, @CurrentActor() a: Actor) {
     return this.admin.deletePage(slug, lang, a);
   }
 
   /* --------------------------------- news --------------------------------- */
 
-  @RequirePermission("content:manage") @Get("news")
+  @RequirePermission("news:manage") @Get("news")
   listNews() { return this.admin.listNews(); }
 
-  @RequirePermission("content:manage") @Post("news")
+  @RequirePermission("news:manage") @Post("news")
   saveNews(@Body() body: unknown, @CurrentActor() a: Actor) {
     const input = z.object({
       id: z.coerce.number().int().positive().optional(),
@@ -55,23 +55,23 @@ export class AdminController {
     return this.admin.saveNews(input, a);
   }
 
-  @RequirePermission("content:manage") @Delete("news/:id")
+  @RequirePermission("news:manage") @Delete("news/:id")
   deleteNews(@Param("id") raw: string, @CurrentActor() a: Actor) {
     return this.admin.deleteNews(idParam.parse(raw), a);
   }
 
   /* -------------------------------- gallery -------------------------------- */
 
-  @RequirePermission("content:manage") @Get("gallery")
+  @RequirePermission("gallery:manage") @Get("gallery")
   listAlbums() { return this.admin.listAlbums(); }
 
-  @RequirePermission("content:manage") @Post("gallery/albums")
+  @RequirePermission("gallery:manage") @Post("gallery/albums")
   createAlbum(@Body() body: unknown, @CurrentActor() a: Actor) {
     const { title, category } = z.object({ title: z.string(), category: z.string().nullish() }).parse(body);
     return this.admin.createAlbum(title, category ?? null, a);
   }
 
-  @RequirePermission("content:manage") @Post("gallery/items")
+  @RequirePermission("gallery:manage") @Post("gallery/items")
   addItem(@Body() body: unknown, @CurrentActor() a: Actor) {
     const { albumId, url, caption } = z.object({
       albumId: z.coerce.number().int().positive(), url: z.string(), caption: z.string().nullish(),
@@ -79,53 +79,53 @@ export class AdminController {
     return this.admin.addGalleryItem(albumId, url, caption ?? null, a);
   }
 
-  @RequirePermission("content:manage") @Delete("gallery/items/:id")
+  @RequirePermission("gallery:manage") @Delete("gallery/items/:id")
   deleteItem(@Param("id") raw: string, @CurrentActor() a: Actor) {
     return this.admin.deleteGalleryItem(idParam.parse(raw), a);
   }
 
-  @RequirePermission("content:manage") @Delete("gallery/albums/:id")
+  @RequirePermission("gallery:manage") @Delete("gallery/albums/:id")
   deleteAlbum(@Param("id") raw: string, @CurrentActor() a: Actor) {
     return this.admin.deleteAlbum(idParam.parse(raw), a);
   }
 
   /* ----------------------------- hero slider -------------------------------- */
 
-  @RequirePermission("content:manage") @Get("hero-images")
+  @RequirePermission("slider:manage") @Get("hero-images")
   listHeroImages() { return this.admin.listHeroImages(); }
 
-  @RequirePermission("content:manage") @Post("hero-images")
+  @RequirePermission("slider:manage") @Post("hero-images")
   addHeroImage(@Body() body: unknown, @CurrentActor() a: Actor) {
     const { url, caption } = z.object({ url: z.string(), caption: z.string().nullish() }).parse(body);
     return this.admin.addHeroImage(url, caption ?? null, a);
   }
 
-  @RequirePermission("content:manage") @Delete("hero-images/:id")
+  @RequirePermission("slider:manage") @Delete("hero-images/:id")
   deleteHeroImage(@Param("id") raw: string, @CurrentActor() a: Actor) {
     return this.admin.deleteHeroImage(idParam.parse(raw), a);
   }
 
   /* ---------------------------- governing body ----------------------------- */
 
-  @RequirePermission("content:manage") @Get("governing")
+  @RequirePermission("governing:manage") @Get("governing")
   listMembers() { return this.admin.listMembers(); }
 
-  @RequirePermission("content:manage") @Post("governing")
+  @RequirePermission("governing:manage") @Post("governing")
   saveMember(@Body() body: Record<string, unknown>, @CurrentActor() a: Actor) {
     return this.admin.saveMember(body, a);
   }
 
-  @RequirePermission("content:manage") @Delete("governing/:id")
+  @RequirePermission("governing:manage") @Delete("governing/:id")
   deleteMember(@Param("id") raw: string, @CurrentActor() a: Actor) {
     return this.admin.deleteMember(idParam.parse(raw), a);
   }
 
   /* ---------------------------- student corner ----------------------------- */
 
-  @RequirePermission("content:manage") @Get("student-corner")
+  @RequirePermission("corner:manage") @Get("student-corner")
   listCorner() { return this.admin.listCornerPosts(); }
 
-  @RequirePermission("content:manage") @Post("student-corner")
+  @RequirePermission("corner:manage") @Post("student-corner")
   saveCorner(@Body() body: unknown, @CurrentActor() a: Actor) {
     const input = z.object({
       id: z.coerce.number().int().positive().optional(),
@@ -135,7 +135,7 @@ export class AdminController {
     return this.admin.saveCornerPost(input, a);
   }
 
-  @RequirePermission("content:manage") @Delete("student-corner/:id")
+  @RequirePermission("corner:manage") @Delete("student-corner/:id")
   deleteCorner(@Param("id") raw: string, @CurrentActor() a: Actor) {
     return this.admin.deleteCornerPost(idParam.parse(raw), a);
   }

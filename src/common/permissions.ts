@@ -21,7 +21,12 @@ export const PERMISSIONS = [
   "payments:refund",
   "payments:export",
   "fees:manage",
-  "content:manage", // CMS pages, news, gallery, student corner, governing body
+  "cms:manage", // CMS pages
+  "news:manage", // News & events
+  "gallery:manage", // Media gallery
+  "slider:manage", // Homepage slider
+  "corner:manage", // Student corner
+  "governing:manage", // Governing body
   "courses:manage",
   "scheduling:manage",
   "reports:manage", // exam results + per-student document generation
@@ -46,7 +51,12 @@ const ADMIN_SUPPORT_PERMISSIONS: Permission[] = [
   "payments:refund",
   "payments:export",
   "fees:manage",
-  "content:manage",
+  "cms:manage",
+  "news:manage",
+  "gallery:manage",
+  "slider:manage",
+  "corner:manage",
+  "governing:manage",
   "courses:manage",
   "scheduling:manage",
   "reports:manage",
@@ -86,12 +96,12 @@ export const ADMIN_NAV: { href: string; label: string; permission: Permission | 
   { href: "/admin/payments", label: "Payments", permission: "payments:read" },
   { href: "/admin/coupons", label: "Coupons", permission: "coupons:manage" },
   { href: "/admin/fees", label: "Fee Configuration", permission: "fees:manage" },
-  { href: "/admin/cms", label: "CMS Pages", permission: "content:manage" },
-  { href: "/admin/news", label: "News & Events", permission: "content:manage" },
-  { href: "/admin/gallery", label: "Media Gallery", permission: "content:manage" },
-  { href: "/admin/hero-slider", label: "Homepage Slider", permission: "content:manage" },
-  { href: "/admin/student-corner", label: "Student Corner", permission: "content:manage" },
-  { href: "/admin/governing", label: "Governing Body", permission: "content:manage" },
+  { href: "/admin/cms", label: "CMS Pages", permission: "cms:manage" },
+  { href: "/admin/news", label: "News & Events", permission: "news:manage" },
+  { href: "/admin/gallery", label: "Media Gallery", permission: "gallery:manage" },
+  { href: "/admin/hero-slider", label: "Homepage Slider", permission: "slider:manage" },
+  { href: "/admin/student-corner", label: "Student Corner", permission: "corner:manage" },
+  { href: "/admin/governing", label: "Governing Body", permission: "governing:manage" },
   { href: "/admin/courses", label: "Courses & Levels", permission: "courses:manage" },
   { href: "/admin/scheduling", label: "Scheduling", permission: "scheduling:manage" },
   { href: "/admin/users", label: "Users", permission: "users:manage" },

@@ -756,23 +756,48 @@ model Coupon {
 }
 
 /**
- * Per-user menu permissions (admin staff). A user with no rows here gets their role's default
- * permissions; a user with rows gets exactly what the grid grants, whatever the role says.
- * Saving the grid always writes a row for every menu, so "present but all false" is a real,
- * deliberate lock-down rather than being mistaken for "no custom setting".
- * What each flag grants is defined in the menu catalog in common/permissions.ts - this table
- * stores only the four switches.
+ * A menu of one of the three panels (admin, teacher, student): one page-group whose four switches
+ * (Access, Insert, Update, Delete) can be granted per user. Seeded by the migration with every
+ * current menu and kept complete at startup (rows are inserted if missing, never overwritten, so
+ * edits on the Menu entry screen survive). What an *admin* menu's switches grant is enforcement
+ * logic and stays in code (common/menu-permissions.ts), deliberately not editable as data.
+ */
+model Menu {
+  id           Int      @id @default(autoincrement())
+  key          String   @unique // stable identifier routes and grants refer to
+  panel        String // ADMIN | TEACHER | STUDENT
+  module       String // the group it appears under
+  label        String
+  href         String // the page it opens
+  note         String?
+  actions      String   @default("access") // comma list of the switches this menu offers (admin menus: derived from the capability map)
+  displayOrder Int      @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  permissions  UserMenuPermission[]
+
+  @@index([panel, displayOrder])
+}
+
+/**
+ * Per-user permission on one menu (admin staff). A user with no rows here gets their role's
+ * default permissions; a user with rows gets exactly what the grid grants, whatever the role
+ * says. Saving the grid always writes a row for every menu, so "present but all false" is a
+ * real, deliberate lock-down rather than being mistaken for "no custom setting".
  */
 model UserMenuPermission {
   id        Int      @id @default(autoincrement())
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  menuKey   String
+  menuId    Int
+  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
   canAccess Boolean  @default(false)
   canInsert Boolean  @default(false)
   canUpdate Boolean  @default(false)
   canDelete Boolean  @default(false)
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, menuKey])
+  @@unique([userId, menuId])
+  @@index([menuId])
 }
