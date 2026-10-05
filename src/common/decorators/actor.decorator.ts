@@ -23,6 +23,14 @@ export const RequirePermission = (permission: Permission) =>
 export const ROLES_REQUIRED = "rolesRequired";
 export const Roles = (...roles: Role[]) => SetMetadata(ROLES_REQUIRED, roles);
 
+/**
+ * Requires the caller to hold the switch this request needs on a menu: Access for GET, Insert for
+ * POST, Update for PUT/PATCH, Delete for DELETE. This is how the teacher and student panels are
+ * checked per page-group; admin routes use `@RequirePermission`, which the admin menus grant.
+ */
+export const REQUIRED_MENU = "requiredMenu";
+export const RequireMenu = (menuKey: string) => SetMetadata(REQUIRED_MENU, menuKey);
+
 /** Injects the resolved actor into a controller method. */
 export const CurrentActor = createParamDecorator((_data: unknown, ctx: ExecutionContext): Actor => {
   const req = ctx.switchToHttp().getRequest<Request & { actor?: Actor }>();

@@ -1,10 +1,10 @@
-import { Body, Controller, Get, Param, Post, Put } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Put, Query } from "@nestjs/common";
 import { z } from "zod";
 import { UserPermissionService } from "./user-permission.service";
 import { CurrentActor, RequirePermission, Roles } from "../../common/decorators/actor.decorator";
 import { ADMIN_ROLES } from "../../common/constants";
 import type { Actor } from "../../common/actor";
-import { MENU_FLAGS } from "../../common/menu-permissions";
+import { MENU_FLAGS, PANELS } from "../../common/menu-permissions";
 
 const id = z.coerce.number().int().positive();
 const userIds = z.array(id).min(1).max(100);
@@ -17,7 +17,10 @@ export class UserPermissionController {
   constructor(private readonly svc: UserPermissionService) {}
 
   @RequirePermission("permissions:manage") @Get("menus")
-  menus() { return this.svc.catalog(); }
+  menus(@Query() q: unknown) {
+    const { panel } = z.object({ panel: z.enum(PANELS).optional() }).parse(q);
+    return this.svc.catalog(panel);
+  }
 
   @RequirePermission("permissions:manage") @Get("users")
   users() { return this.svc.users(); }

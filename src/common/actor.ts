@@ -1,5 +1,6 @@
 import { ADMIN_ROLES, type Role } from "./constants";
 import { permissionsFor, type Permission } from "./permissions";
+import type { MenuFlag, MenuGrid } from "./menu-permissions";
 import { forbidden, unauthenticated } from "./errors/app-error";
 
 /**
@@ -30,7 +31,13 @@ export type Actor = {
    * per-user grid.
    */
   permissions?: readonly Permission[];
+  /** The switches held on each active menu of this person's own panel. Resolved with `permissions`. */
+  menus?: Record<string, MenuGrid>;
 };
+
+/** Whether the actor holds `flag` on the menu `menuKey`. */
+export const actorCanOnMenu = (actor: Actor, menuKey: string, flag: MenuFlag): boolean =>
+  actor.menus?.[menuKey]?.[flag] === true;
 
 /** The one place a capability is checked against an actor. */
 export const actorHas = (actor: Actor, permission: Permission): boolean =>

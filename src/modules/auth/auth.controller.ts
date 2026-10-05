@@ -6,6 +6,7 @@ import { AuthService, SESSION_COOKIE } from "./auth.service";
 import { RefreshTokenService } from "./refresh-token.service";
 import { CurrentActor, Public } from "../../common/decorators/actor.decorator";
 import { actorHas } from "../../common/actor";
+import { MenuCatalogService } from "../../common/menu-catalog.service";
 import { PERMISSIONS } from "../../common/permissions";
 import { unauthenticated } from "../../common/errors/app-error";
 import { ADMIN_ROLES, type Role } from "../../common/constants";
@@ -31,6 +32,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly refresh: RefreshTokenService,
+    private readonly menuCatalog: MenuCatalogService,
   ) {}
 
   /**
@@ -137,7 +139,7 @@ export class AuthController {
    * disagree (SEC-4 / SEC-5).
    */
   @Get("me")
-  me(@CurrentActor() actor: Actor) {
+  async me(@CurrentActor() actor: Actor) {
     return {
       userId: actor.userId,
       loginId: actor.loginId,
@@ -145,6 +147,10 @@ export class AuthController {
       name: actor.name,
       mustChangePassword: actor.mustChangePassword,
       permissions: PERMISSIONS.filter((p) => actorHas(actor, p)),
+      // The menus this person's sidebar is built from: active, in their own panel, Access held.
+      menus: (await this.menuCatalog.all())
+        .filter((m) => m.active && actor.menus?.[m.key]?.access)
+        .map((m) => ({ key: m.key, module: m.module, label: m.label, href: m.href, flags: actor.menus![m.key] })),
     };
   }
 }

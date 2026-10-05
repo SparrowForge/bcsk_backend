@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
 import { z } from "zod";
 import { ClassroomService } from "./classroom.service";
-import { CurrentActor, Public, Roles } from "../../common/decorators/actor.decorator";
+import { CurrentActor, Public, RequireMenu, Roles } from "../../common/decorators/actor.decorator";
 import { forbidden } from "../../common/errors/app-error";
 import type { Actor, MaybeActor } from "../../common/actor";
 import type { Request } from "express";
@@ -63,48 +63,60 @@ export class ClassroomController {
   @Get("dashboard")
   dashboard(@CurrentActor() a: Actor) { return this.classroom.dashboard(this.student(a)); }
 
+  @RequireMenu("classroom.assignments")
   @Get("assignments")
   assignments(@CurrentActor() a: Actor) { return this.classroom.assignments(this.student(a)); }
 
+  @RequireMenu("classroom.assignments")
   @Post("assignments/submit")
   submit(@Body() body: unknown, @CurrentActor() a: Actor) {
     const input = submit.parse(body);
     return this.classroom.submitAssignment(this.student(a), input.assignmentId, input.text ?? null, input.filePath ?? null);
   }
 
+  @RequireMenu("classroom.results")
   @Get("results")
   results(@CurrentActor() a: Actor) { return this.classroom.results(this.student(a)); }
 
+  @RequireMenu("classroom.attendance")
   @Get("attendance")
   attendance(@CurrentActor() a: Actor) { return this.classroom.attendance(this.student(a)); }
 
+  @RequireMenu("classroom.routine")
   @Get("routine")
   routine(@CurrentActor() a: Actor) { return this.classroom.routine(this.student(a)); }
 
+  @RequireMenu("classroom.videos")
   @Get("videos")
   videos(@CurrentActor() a: Actor) { return this.classroom.videos(this.student(a)); }
 
+  @RequireMenu("classroom.ask-teacher")
   @Get("teachers")
   teachers(@CurrentActor() a: Actor) {
     this.student(a);
     return this.classroom.teacherDirectory();
   }
 
+  @RequireMenu("classroom.syllabus")
   @Get("syllabus")
   syllabus(@CurrentActor() a: Actor) { return this.classroom.syllabus(this.student(a)); }
 
+  @RequireMenu("classroom.re-admission")
   @Get("re-admission")
   reAdmission(@CurrentActor() a: Actor) { return this.classroom.reAdmissionInfo(this.student(a)); }
 
+  @RequireMenu("classroom.re-admission")
   @Post("re-admission")
   submitReAdmission(@Body() body: unknown, @CurrentActor() a: Actor) {
     const { receiptPath } = z.object({ receiptPath: z.string().min(1) }).parse(body);
     return this.classroom.submitReAdmission(this.student(a), receiptPath);
   }
 
+  @RequireMenu("classroom.ask-teacher")
   @Get("questions")
   questions(@CurrentActor() a: Actor) { return this.classroom.questions(this.student(a)); }
 
+  @RequireMenu("classroom.ask-teacher")
   @Post("questions")
   ask(@Body() body: unknown, @CurrentActor() a: Actor) {
     const input = ask.parse(body);

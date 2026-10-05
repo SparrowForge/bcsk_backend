@@ -1,13 +1,14 @@
 import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
-import { IS_PUBLIC, REQUIRED_PERMISSION, ROLES_REQUIRED } from "../decorators/actor.decorator";
+import { IS_PUBLIC, REQUIRED_MENU, REQUIRED_PERMISSION, ROLES_REQUIRED } from "../decorators/actor.decorator";
+import { flagForMethod } from "../menu-permissions";
 import type { Role } from "../constants";
 import { AuthService } from "../../modules/auth/auth.service";
 import type { Permission } from "../permissions";
 import { forbidden, unauthenticated } from "../errors/app-error";
 import { log } from "../logger";
-import { actorHas, type Actor } from "../actor";
+import { actorCanOnMenu, actorHas, type Actor } from "../actor";
 
 /**
  * Registered globally in AppModule, so **every** route is authenticated unless it is
@@ -42,6 +43,13 @@ export class AuthGuard implements CanActivate {
     if (roles && !roles.includes(actor.role)) {
       log.warn("auth", "api_role_denied", { route: req.originalUrl, userId: actor.userId, role: actor.role });
       throw forbidden("This area is not available to your account.");
+    }
+
+    // Teacher and student pages are checked per menu: the switch this HTTP method needs.
+    const menuKey = this.reflector.getAllAndOverride<string | undefined>(REQUIRED_MENU, targets);
+    if (menuKey && !actorCanOnMenu(actor, menuKey, flagForMethod(req.method))) {
+      log.warn("auth", "api_menu_denied", { route: req.originalUrl, userId: actor.userId, role: actor.role, menu: menuKey });
+      throw forbidden("You don't have access to this.");
     }
 
     const required = this.reflector.getAllAndOverride<Permission | undefined>(

@@ -11,7 +11,8 @@ import { unprocessable } from "../../common/errors/app-error";
 import { SignJWT, jwtVerify } from "../../common/jose";
 import type { Role } from "../../common/constants";
 import type { Actor, ActorTransport } from "../../common/actor";
-import { effectivePermissions } from "../../common/menu-permissions";
+import { effectiveAccess } from "../../common/menu-permissions";
+import { MenuCatalogService } from "../../common/menu-catalog.service";
 
 /**
  * Authentication for both transports.
@@ -37,6 +38,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly rateLimit: RateLimitService,
+    private readonly menuCatalog: MenuCatalogService,
   ) {}
 
   /**
@@ -165,10 +167,17 @@ export class AuthService {
           mustChangePassword: true,
           // The per-user menu grid rides along on the lookup this already does, so custom
           // permissions cost no extra round trip.
-          menuPermissions: { select: { menuKey: true, canAccess: true, canInsert: true, canUpdate: true, canDelete: true } },
+          menuPermissions: {
+            select: { menu: { select: { key: true } }, canAccess: true, canInsert: true, canUpdate: true, canDelete: true },
+          },
         },
       });
       if (!user?.active) return null;
+      const access = effectiveAccess(
+        payload.role as Role,
+        user.menuPermissions.map((r) => ({ menuKey: r.menu.key, canAccess: r.canAccess, canInsert: r.canInsert, canUpdate: r.canUpdate, canDelete: r.canDelete })),
+        await this.menuCatalog.all(),
+      );
       return {
         userId,
         loginId: payload.loginId as string,
@@ -176,7 +185,8 @@ export class AuthService {
         name: payload.name as string,
         mustChangePassword: user.mustChangePassword,
         transport,
-        permissions: effectivePermissions(payload.role as Role, user.menuPermissions),
+        permissions: access.permissions,
+        menus: access.menus,
       };
     } catch {
       return null;
