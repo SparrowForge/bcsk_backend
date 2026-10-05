@@ -19,6 +19,7 @@ export const RATE_LIMITS = {
   passwordReset: { limit: 5, windowSeconds: 900 },
   apply: { limit: 5, windowSeconds: 3600 },
   contact: { limit: 5, windowSeconds: 3600 },
+  lead: { limit: 5, windowSeconds: 3600 },
   payment: { limit: 20, windowSeconds: 3600 },
   upload: { limit: 30, windowSeconds: 3600 },
 } as const;

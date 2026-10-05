@@ -19,6 +19,7 @@ import { ClassroomModule } from "./modules/classroom/classroom.module";
 import { OfficeModule } from "./modules/office/office.module";
 import { DocumentModule } from "./modules/document/document.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { LeadsModule } from "./modules/leads/leads.module";
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { AdminModule } from "./modules/admin/admin.module";
     OfficeModule,
     DocumentModule,
     AdminModule,
+    LeadsModule,
     HealthModule,
   ],
   providers: [

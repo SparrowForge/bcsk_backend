@@ -10,7 +10,7 @@
  * Identify people by `loginId` or `userId`, never by credential.
  */
 
-export type LogCategory = "auth" | "payment" | "activation" | "config";
+export type LogCategory = "auth" | "payment" | "activation" | "config" | "crm";
 type Level = "info" | "warn" | "error";
 type Fields = Record<string, string | number | boolean | null | undefined>;
 

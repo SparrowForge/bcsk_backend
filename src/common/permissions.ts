@@ -26,6 +26,8 @@ export const PERMISSIONS = [
   "scheduling:manage",
   "reports:manage", // exam results + per-student document generation
   "tickets:manage",
+  "leads:read", // CRM: view leads, pipeline, follow-ups, reports
+  "leads:manage", // CRM: create/edit leads, move stages, assign, convert, manage sources
   "users:manage",
   "settings:manage",
   "audit:read",
@@ -47,6 +49,8 @@ const ADMIN_SUPPORT_PERMISSIONS: Permission[] = [
   "scheduling:manage",
   "reports:manage",
   "tickets:manage",
+  "leads:read",
+  "leads:manage",
 ];
 
 /** IT support: accounts and the support queue. Deliberately no money, no admissions. */
@@ -75,6 +79,7 @@ export function roleHas(role: Role, permission: Permission): boolean {
 export const ADMIN_NAV: { href: string; label: string; permission: Permission | null }[] = [
   { href: "/admin/dashboard", label: "Dashboard", permission: null },
   { href: "/admin/admissions", label: "Admissions", permission: "admissions:read" },
+  { href: "/admin/leads", label: "CRM Leads", permission: "leads:read" },
   { href: "/admin/payments", label: "Payments", permission: "payments:read" },
   { href: "/admin/fees", label: "Fee Configuration", permission: "fees:manage" },
   { href: "/admin/cms", label: "CMS Pages", permission: "content:manage" },

@@ -60,6 +60,8 @@ model User {
   auditLogs      AuditLog[]
   passwordResets PasswordReset[]
   refreshTokens  RefreshToken[]
+  assignedLeads Lead[]         @relation("LeadOwner")
+  leadActivities LeadActivity[]
 }
 
 /**
@@ -153,6 +155,7 @@ model Course {
   levels      CourseLevel[]
   sessions    ClassSession[]
   fees        FeeConfig[]
+  leads       Lead[]
 }
 
 model CourseLevel {
@@ -321,6 +324,7 @@ model ApplicationForm {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   payments         Payment[]
+  leads            Lead[]
 
   @@index([status, createdAt])
   @@index([type, createdAt])
@@ -642,4 +646,81 @@ model RateLimit {
 model Setting {
   key   String @id // smtp_host, whatsapp_number, zoom_account, pg_client_key, stat_total_students, ...
   value String
+}
+/* ---------------------------------- CRM ----------------------------------
+ * Prospective-student pipeline, ported from lms_taiba. A Lead is kept after conversion
+ * (stage ENROLLED, convertedApplicationId set) so funnel reporting stays intact.
+ * Stage / outcome / lost-reason values are validated in leads.schema.ts, not as enums, to
+ * match the rest of this schema (status columns are plain strings). */
+
+model LeadSource {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  code        String?
+  description String?
+  isPublic    Boolean  @default(false) // offered on the public enquiry form
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  leads       Lead[]
+}
+
+model Lead {
+  id               Int       @id @default(autoincrement())
+  leadNo           String    @unique // LD-YYMM-NNNN
+  name             String
+  email            String?
+  phone            String?
+  alternatePhone   String?
+  gender           String?
+  city             String?
+  sourceId         Int?
+  source           LeadSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  campaign         String?
+  referredBy       String?
+  courseId         Int?
+  course           Course?   @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  stage            String    @default("NEW") // NEW | CONTACTED | QUALIFIED | APPLIED | ADMITTED | ENROLLED | LOST
+  lostReason       String?
+  lostNote         String?
+  score            Int       @default(0)
+  assignedToUserId Int?
+  assignedTo       User?     @relation("LeadOwner", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  lastContactedAt  DateTime?
+  nextFollowUpAt   DateTime?
+  convertedApplicationId Int?
+  convertedApplication   ApplicationForm? @relation(fields: [convertedApplicationId], references: [id], onDelete: SetNull)
+  convertedAt      DateTime?
+  remarks          String?
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  activities       LeadActivity[]
+
+  @@index([stage])
+  @@index([assignedToUserId])
+  @@index([nextFollowUpAt])
+  @@index([email])
+  @@index([phone])
+}
+
+model LeadActivity {
+  id                Int       @id @default(autoincrement())
+  leadId            Int
+  lead              Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type              String // CALL | EMAIL | SMS | WHATSAPP | MEETING | CAMPUS_VISIT | NOTE | STAGE_CHANGE | ASSIGNMENT
+  subject           String
+  notes             String?
+  outcome           String? // REACHED | NO_ANSWER | CALLBACK_REQUESTED | NOT_INTERESTED | INFORMATION_SENT | COMPLETED
+  scheduledAt       DateTime?
+  completedAt       DateTime?
+  performedByUserId Int?
+  performedBy       User?     @relation(fields: [performedByUserId], references: [id], onDelete: SetNull)
+  isSystemGenerated Boolean   @default(false)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([leadId])
+  @@index([scheduledAt])
 }
