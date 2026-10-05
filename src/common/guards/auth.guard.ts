@@ -1,7 +1,8 @@
 import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
-import { IS_PUBLIC, REQUIRED_PERMISSION } from "../decorators/actor.decorator";
+import { IS_PUBLIC, REQUIRED_PERMISSION, ROLES_REQUIRED } from "../decorators/actor.decorator";
+import type { Role } from "../constants";
 import { AuthService } from "../../modules/auth/auth.service";
 import type { Permission } from "../permissions";
 import { forbidden, unauthenticated } from "../errors/app-error";
@@ -34,6 +35,14 @@ export class AuthGuard implements CanActivate {
 
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
     if (!actor) throw unauthenticated();
+
+    // Which panel is this? A route marked for other roles is closed to everyone else, whatever
+    // permissions they hold - a student never reaches an admin route by being granted a capability.
+    const roles = this.reflector.getAllAndOverride<Role[] | undefined>(ROLES_REQUIRED, targets);
+    if (roles && !roles.includes(actor.role)) {
+      log.warn("auth", "api_role_denied", { route: req.originalUrl, userId: actor.userId, role: actor.role });
+      throw forbidden("This area is not available to your account.");
+    }
 
     const required = this.reflector.getAllAndOverride<Permission | undefined>(
       REQUIRED_PERMISSION,

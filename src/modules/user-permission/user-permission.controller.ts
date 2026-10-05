@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Param, Post, Put } from "@nestjs/common";
 import { z } from "zod";
 import { UserPermissionService } from "./user-permission.service";
-import { CurrentActor, RequirePermission } from "../../common/decorators/actor.decorator";
+import { CurrentActor, RequirePermission, Roles } from "../../common/decorators/actor.decorator";
+import { ADMIN_ROLES } from "../../common/constants";
 import type { Actor } from "../../common/actor";
 import { MENU_FLAGS } from "../../common/menu-permissions";
 
@@ -10,6 +11,7 @@ const userIds = z.array(id).min(1).max(100);
 const flags = z.object(Object.fromEntries(MENU_FLAGS.map((f) => [f, z.boolean().optional()])) as Record<(typeof MENU_FLAGS)[number], z.ZodOptional<z.ZodBoolean>>);
 const saveBody = z.object({ userIds, grid: z.record(z.string(), flags) });
 
+@Roles(...ADMIN_ROLES)
 @Controller("user-permissions")
 export class UserPermissionController {
   constructor(private readonly svc: UserPermissionService) {}

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
 import { z } from "zod";
 import { ClassroomService } from "./classroom.service";
-import { CurrentActor, Public } from "../../common/decorators/actor.decorator";
+import { CurrentActor, Public, Roles } from "../../common/decorators/actor.decorator";
 import { forbidden } from "../../common/errors/app-error";
 import type { Actor, MaybeActor } from "../../common/actor";
 import type { Request } from "express";
@@ -19,6 +19,7 @@ const ask = z.object({
 });
 
 /** Student-only. Every method scopes to the caller's own records. */
+@Roles("STUDENT")
 @Controller("classroom")
 export class ClassroomController {
   constructor(private readonly classroom: ClassroomService) {}

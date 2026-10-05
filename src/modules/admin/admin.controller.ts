@@ -1,12 +1,14 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { z } from "zod";
 import { AdminService } from "./admin.service";
-import { CurrentActor, Public, RequirePermission } from "../../common/decorators/actor.decorator";
+import { CurrentActor, Public, RequirePermission, Roles } from "../../common/decorators/actor.decorator";
+import { ADMIN_ROLES } from "../../common/constants";
 import type { Actor } from "../../common/actor";
 
 const idParam = z.coerce.number().int().positive();
 const reason = z.object({ reason: z.string().trim().min(1) });
 
+@Roles(...ADMIN_ROLES)
 @Controller("admin")
 export class AdminController {
   constructor(private readonly admin: AdminService) {}

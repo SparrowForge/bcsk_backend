@@ -7,7 +7,8 @@ import {
   activitySchema, activityUpdateSchema, assignSchema, bulkAssignSchema, convertSchema, createLeadSchema,
   funnelQuery, listLeadsQuery, publicEnquirySchema, sourceSchema, stageSchema, updateLeadSchema,
 } from "./leads.schema";
-import { CurrentActor, Public, RequirePermission } from "../../common/decorators/actor.decorator";
+import { CurrentActor, Public, RequirePermission, Roles } from "../../common/decorators/actor.decorator";
+import { ADMIN_ROLES } from "../../common/constants";
 import type { Actor } from "../../common/actor";
 import { clientIp } from "../../common/client-ip";
 import { RateLimitService } from "../../common/rate-limit.service";
@@ -21,6 +22,7 @@ const mineQuery = z.object({ mine: z.enum(["1", "true"]).optional() });
  * CRM. Static segments (`board`, `stats`, `follow-ups`, `activities`, `sources`, ...) are
  * declared before `:id` so they are not captured as an id.
  */
+@Roles(...ADMIN_ROLES)
 @Controller("leads")
 export class LeadsController {
   constructor(

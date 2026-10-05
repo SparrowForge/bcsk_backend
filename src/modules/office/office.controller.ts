@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import { z } from "zod";
 import { OfficeService } from "./office.service";
-import { CurrentActor } from "../../common/decorators/actor.decorator";
+import { CurrentActor, Roles } from "../../common/decorators/actor.decorator";
 import { forbidden } from "../../common/errors/app-error";
 import type { Actor } from "../../common/actor";
 
@@ -22,6 +22,7 @@ const assignment = z.object({
 });
 
 /** Teacher-only. */
+@Roles("TEACHER")
 @Controller("office")
 export class OfficeController {
   constructor(private readonly office: OfficeService) {}
