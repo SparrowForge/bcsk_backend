@@ -36,6 +36,9 @@ export class PublicController {
   @Public() @Get("special-courses")
   specialCourses() { return this.admin.specialCourses(); }
 
+  @Public() @Get("regular-levels")
+  regularLevels() { return this.admin.regularLevels(); }
+
   /** Homepage office + classroom boards (LP-2, LP-3). */
   @Public() @Get("school-board")
   schoolBoard() { return this.admin.schoolBoard(); }

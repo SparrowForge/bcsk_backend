@@ -452,6 +452,47 @@ async function main() {
     await db.feeConfig.upsert({ where: { key: f.key }, update: {}, create: { ...rest, displayOrder: order } });
   }
 
+  /* ---------------- Regular Course levels, and fees tied to course levels ---------------- */
+  // Pre-Primary and Class 1-5 are CourseLevel rows of one "Regular Course"; the fee rows point at
+  // them through courseLevelId. Mirrors migration 20261006000000_course_level_fees.
+  const regularCourse = await db.course.upsert({
+    where: { slug: "regular-course" },
+    update: {},
+    create: { slug: "regular-course", name: "Regular Course", type: "REGULAR", category: "class", description: "Pre-Primary to Class 5 - the full NCTB curriculum.", displayOrder: 0 },
+  });
+  const regularLevels = [
+    ["Pre-Primary", "PRE_PRIMARY"], ["Class 1", "CLASS_1"], ["Class 2", "CLASS_2"],
+    ["Class 3", "CLASS_3"], ["Class 4", "CLASS_4"], ["Class 5", "CLASS_5"],
+  ] as const;
+  for (const [i, [name, code]] of regularLevels.entries()) {
+    const level = await db.courseLevel.upsert({
+      where: { courseId_code: { courseId: regularCourse.id, code } },
+      update: {},
+      create: { courseId: regularCourse.id, name, code, displayOrder: i },
+    });
+    await db.feeConfig.updateMany({
+      where: { key: code.toLowerCase(), courseLevelId: null },
+      data: { courseId: regularCourse.id, courseLevelId: level.id },
+    });
+  }
+  const feeCourseSlug = (key: string) => key.replace(/_/g, "-");
+  for (const f of fees.filter((x) => x.kind === "SPECIAL_COURSE")) {
+    const course = await db.course.findUnique({ where: { slug: feeCourseSlug(f.key) }, include: { levels: true } });
+    if (!course) continue;
+    await db.feeConfig.updateMany({ where: { key: f.key, courseId: null }, data: { courseId: course.id } });
+    for (const level of course.levels) {
+      const { order, ...rest } = f;
+      await db.feeConfig.upsert({
+        where: { key: `${f.key}_l${level.id}` },
+        update: {},
+        create: {
+          ...rest, key: `${f.key}_l${level.id}`, label: `${course.name} - ${level.name}`, kind: "SPECIAL_LEVEL",
+          courseId: course.id, courseLevelId: level.id, displayOrder: order * 100 + level.displayOrder,
+        },
+      });
+    }
+  }
+
   /* ---------------- Curriculum entries (from bcskr.org + SRS NCTB list) ---------------- */
   const curriculum: Array<[string, string[]]> = [
     ["PRE_PRIMARY", ["Bangla & English (combined)", "Religious Studies (Islam / Hindu)"]],

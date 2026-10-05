@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { z } from "zod";
 import { AdmissionService } from "./admission.service";
-import { regularApplicationSchema, specialApplicationSchema } from "./admission.schema";
+import { applicationSchema, feePreviewSchema } from "./admission.schema";
 import { CurrentActor, Public, RequirePermission } from "../../common/decorators/actor.decorator";
 import type { Actor } from "../../common/actor";
 import { clientIp } from "../../common/client-ip";
@@ -14,21 +14,38 @@ const pageQuery = z.object({
   status: z.string().optional(),
 });
 
+const asObject = (v: unknown): Record<string, unknown> =>
+  v && typeof v === "object" ? (v as Record<string, unknown>) : {};
 
 @Controller("admissions")
 export class AdmissionController {
   constructor(private readonly admissions: AdmissionService) {}
 
+  /** Every registration type - regular, special, re-admission - posts here. */
+  @Public()
+  @Post()
+  submit(@Body() body: unknown, @Req() req: Request) {
+    return this.admissions.submit(applicationSchema.parse(body), clientIp(req));
+  }
+
+  /** The same endpoint under the two original paths, so older callers keep working. */
   @Public()
   @Post("regular")
   regular(@Body() body: unknown, @Req() req: Request) {
-    return this.admissions.submitRegular(regularApplicationSchema.parse(body), clientIp(req));
+    return this.admissions.submit(applicationSchema.parse({ ...asObject(body), type: "REGULAR" }), clientIp(req));
   }
 
   @Public()
   @Post("special")
   special(@Body() body: unknown, @Req() req: Request) {
-    return this.admissions.submitSpecial(specialApplicationSchema.parse(body), clientIp(req));
+    return this.admissions.submit(applicationSchema.parse({ ...asObject(body), type: "SPECIAL" }), clientIp(req));
+  }
+
+  /** Fee table for the grade or course picked on the form. Display only; payment recomputes. */
+  @Public()
+  @Get("fee-preview")
+  feePreview(@Query() query: unknown) {
+    return this.admissions.feePreview(feePreviewSchema.parse(query));
   }
 
   @Public()

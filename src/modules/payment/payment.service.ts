@@ -11,6 +11,24 @@ import { assertPaymentToken } from "./payment-token";
 
 export const krw = (n: number) => `₩${n.toLocaleString("en-US")}`;
 
+/** A special course's slug is not always its FeeConfig key. */
+const SLUG_TO_FEE_KEY: Record<string, string> = {
+  "ielts-for-kids": "ielts_for_kids",
+  abacus: "abacus",
+  deen: "deen",
+  hifz: "hifz",
+  "debate-club": "debate_club",
+  "bangla-language": "bangla_language",
+};
+const specialFeeKey = (slug: string | null | undefined) => SLUG_TO_FEE_KEY[slug ?? ""] ?? slug ?? "";
+
+/** Payment.purpose for an application of this type. */
+export const paymentPurpose = (type: string) =>
+  type === "REGULAR" ? "ADMISSION" : type === "RE_ADMISSION" ? "RE_ADMISSION" : "SPECIAL_COURSE";
+
+export type FeeOption = { key: string; label: string; lines: { label: string; amount: number }[]; total: number };
+export type FeeStructure = { title: string; options: FeeOption[]; bookFee: number | null };
+
 const OPEN_STATUSES = ["PENDING", "PENDING_VERIFICATION", "PAID", "VERIFIED"];
 
 /**
@@ -42,17 +60,31 @@ export class PaymentService {
    * their own price. There is deliberately **no override parameter** — the only way to
    * change the rate is to change the persisted claim.
    */
+  /**
+   * The fee row for a registration. A level's own row wins (`FeeConfig.courseLevelId`); a
+   * course without levels, or a level nobody has priced separately, falls back to the course's
+   * default row, and a legacy application with only a grade falls back to its key.
+   */
+  private async findFee(q: { type: string; courseLevelId?: number | null; grade?: string | null; courseName?: string | null }) {
+    if (q.courseLevelId) {
+      const own = await this.prisma.feeConfig.findUnique({ where: { courseLevelId: q.courseLevelId } });
+      if (own) return own;
+    }
+    const key = q.type === "SPECIAL" ? specialFeeKey(q.courseName) : (q.grade ?? "").toLowerCase();
+    return this.prisma.feeConfig.findUnique({ where: { key } });
+  }
+
   async computeFee(app: {
     type: string;
     grade: string | null;
     courseName: string | null;
+    courseLevelId?: number | null;
     isBcskStudent?: boolean;
   }): Promise<{ amount: number; breakdown: string }> {
     const isBcsk = app.isBcskStudent === true;
 
     if (app.type === "REGULAR" || app.type === "RE_ADMISSION") {
-      const key = (app.grade ?? "").toLowerCase();
-      const fee = await this.prisma.feeConfig.findUnique({ where: { key } });
+      const fee = await this.findFee(app);
       if (!fee) throw notFound(`Fee configuration for ${app.grade}`);
       if (app.type === "RE_ADMISSION") {
         return {
@@ -66,21 +98,61 @@ export class PaymentService {
       };
     }
 
-    const slugToKey: Record<string, string> = {
-      "ielts-for-kids": "ielts_for_kids",
-      abacus: "abacus",
-      deen: "deen",
-      hifz: "hifz",
-      "debate-club": "debate_club",
-      "bangla-language": "bangla_language",
-    };
-    const key = slugToKey[app.courseName ?? ""] ?? app.courseName ?? "";
-    const fee = await this.prisma.feeConfig.findUnique({ where: { key } });
+    const fee = await this.findFee(app);
     if (!fee) throw notFound(`Fee configuration for ${app.courseName}`);
     const course = isBcsk ? (fee.bcskPrice ?? 0) : (fee.nonBcskPrice ?? 0);
     return {
       amount: fee.admissionFee + course,
       breakdown: `Admission fee ${krw(fee.admissionFee)} + Course fee ${krw(course)} (${isBcsk ? "BCSK" : "non-BCSK"} student rate)`,
+    };
+  }
+
+  /**
+   * The fee table the application form shows once a grade or course is chosen. Built from the
+   * same FeeConfig rows and the same rules as `computeFee`, so what the family reads is what
+   * they are charged. A special course has two options because the family's BCSK-student claim
+   * is theirs to make; the form highlights the one that matches it.
+   */
+  async feeStructure(q: { type: string; grade?: string; courseName?: string; courseLevelId?: number }): Promise<FeeStructure> {
+    if (q.type === "SPECIAL") {
+      const fee = await this.findFee(q);
+      if (!fee) throw notFound(`Fee configuration for ${q.courseName}`);
+      const option = (key: string, label: string, course: number): FeeOption => ({
+        key,
+        label,
+        lines: [
+          { label: "Admission fee", amount: fee.admissionFee },
+          { label: "Course fee", amount: course },
+        ],
+        total: fee.admissionFee + course,
+      });
+      return {
+        title: fee.label,
+        options: [
+          option("bcsk", "BCSK student rate", fee.bcskPrice ?? 0),
+          option("non_bcsk", "Non-BCSK student rate", fee.nonBcskPrice ?? 0),
+        ],
+        bookFee: fee.bookFee,
+      };
+    }
+
+    const fee = await this.findFee(q);
+    if (!fee || fee.kind !== "REGULAR_CLASS") throw notFound(`Fee configuration for ${q.grade ?? "that class"}`);
+    const waived = q.type === "RE_ADMISSION";
+    return {
+      title: fee.label,
+      options: [
+        {
+          key: "standard",
+          label: waived ? "Re-admission (admission fee waived)" : "New admission",
+          lines: [
+            { label: waived ? "Admission fee (waived)" : "Admission fee", amount: waived ? 0 : fee.admissionFee },
+            { label: "Semester fee", amount: fee.semesterFee },
+          ],
+          total: (waived ? 0 : fee.admissionFee) + fee.semesterFee,
+        },
+      ],
+      bookFee: fee.bookFee,
     };
   }
 
@@ -120,7 +192,7 @@ export class PaymentService {
     await this.prisma.payment.create({
       data: {
         applicationId,
-        purpose: app.type === "REGULAR" ? "ADMISSION" : "SPECIAL_COURSE",
+        purpose: paymentPurpose(app.type),
         method: "CARD",
         amount: fee.amount,
         status: "PENDING",
@@ -144,7 +216,7 @@ export class PaymentService {
       this.prisma.payment.create({
         data: {
           applicationId,
-          purpose: app.type === "REGULAR" ? "ADMISSION" : "SPECIAL_COURSE",
+          purpose: paymentPurpose(app.type),
           method: "BANK_TRANSFER",
           amount: fee.amount,
           status: "PENDING_VERIFICATION",
@@ -351,6 +423,57 @@ export class PaymentService {
   }
 
   /**
+   * Re-admission through the public form: the student is identified by the ID verified at submit,
+   * enrolled into the chosen class for this semester, and the application is linked to them.
+   */
+  private async renewEnrolment(app: {
+    id: number; studentId: string | null; grade: string | null; email: string | null; applicantName: string;
+  }): Promise<{ studentId: string }> {
+    const profile = app.studentId
+      ? await this.prisma.studentProfile.findUnique({ where: { studentId: app.studentId } })
+      : null;
+    if (!profile || !app.grade) throw conflict("This re-admission does not match a student record. Check the Student ID.");
+    const grade = app.grade;
+    const sessions = await this.prisma.classSession.findMany({
+      where: { classLevel: grade, semester: SEMESTER_CURRENT, active: true },
+      select: { id: true },
+    });
+    await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.applicationForm.updateMany({
+        where: { id: app.id, createdStudentUserId: null },
+        data: { status: "APPROVED", createdStudentUserId: profile.userId },
+      });
+      if (claimed.count === 0) throw conflict("This application has already been activated.");
+      await tx.studentProfile.update({ where: { id: profile.id }, data: { classLevel: grade } });
+      for (const cs of sessions) {
+        await tx.enrollment.upsert({
+          where: {
+            studentUserId_classSessionId_semester: {
+              studentUserId: profile.userId, classSessionId: cs.id, semester: SEMESTER_CURRENT,
+            },
+          },
+          update: { status: "ACTIVE" },
+          create: { studentUserId: profile.userId, classSessionId: cs.id, semester: SEMESTER_CURRENT },
+        });
+      }
+      await tx.payment.updateMany({
+        where: { applicationId: app.id, payerUserId: null },
+        data: { payerUserId: profile.userId },
+      });
+      await tx.notification.create({
+        data: {
+          userId: profile.userId,
+          title: "Re-admission confirmed",
+          body: `Your enrollment for semester ${SEMESTER_CURRENT} is renewed.`,
+          kind: "ADMIN",
+        },
+      });
+    });
+    log.info("activation", "re_admission_renewed", { applicationId: app.id, studentId: profile.studentId, enrolments: sessions.length });
+    return { studentId: profile.studentId };
+  }
+
+  /**
    * BUG-2: user, profile, enrolments, payment adoption and application status commit
    * together or not at all. BUG-1: the new account adopts its application's payments
    * inside that same transaction.
@@ -371,6 +494,9 @@ export class PaymentService {
       });
       return { studentId: existing?.studentId ?? "already-active" };
     }
+
+    // A returning student already has an account: renew it, never create a second one.
+    if (app.type === "RE_ADMISSION") return this.renewEnrolment(app);
 
     const tempPassword = randomBytes(9).toString("base64url");
     const hash = await bcrypt.hash(tempPassword, 12);

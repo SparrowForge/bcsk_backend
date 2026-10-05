@@ -152,12 +152,14 @@ model Course {
   displayOrder Int    @default(100)
   levels      CourseLevel[]
   sessions    ClassSession[]
+  fees        FeeConfig[]
 }
 
 model CourseLevel {
   id           Int     @id @default(autoincrement())
   courseId     Int
   name         String // "Level 0" .. "Level 7", "Pre-Primary", track names
+  code         String? // stable key for the levels other tables still name as text: PRE_PRIMARY, CLASS_1..CLASS_5
   displayOrder Int     @default(0)
   syllabus     String? // markdown/plain topic coverage
   studentBookUrl String?
@@ -165,7 +167,9 @@ model CourseLevel {
   course       Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
   sessions     ClassSession[]
   applications ApplicationForm[]
+  fees         FeeConfig[]
 
+  @@unique([courseId, code])
   @@index([courseId, displayOrder])
 }
 
@@ -275,7 +279,7 @@ model ClassVideo {
 
 model ApplicationForm {
   id               Int      @id @default(autoincrement())
-  type             String // REGULAR | SPECIAL | RE_ADMISSION
+  type             String // REGULAR | SPECIAL | RE_ADMISSION - every registration lands in this one table
   status           String   @default("PENDING_PAYMENT") // PENDING_PAYMENT | PENDING_VERIFICATION | PAID | APPROVED | REJECTED | CORRECTIONS_REQUESTED
   // shared applicant fields
   applicantName    String
@@ -288,8 +292,12 @@ model ApplicationForm {
   addressKorea     String?
   addressBangladesh String?
   emergencyContact String?
+  learningMode     String? // online | hybrid
+  // re-admission: the returning student's existing ID, verified against StudentProfile at submit
+  studentId        String?
+  semester         String? // the semester the registration is for
   // regular course
-  grade            String? // PRE_PRIMARY..CLASS_5
+  grade           String? // PRE_PRIMARY..CLASS_5
   fatherName       String?
   motherName       String?
   guardianProfession String?
@@ -315,6 +323,7 @@ model ApplicationForm {
   payments         Payment[]
 
   @@index([status, createdAt])
+  @@index([type, createdAt])
 }
 
 model Payment {
@@ -349,9 +358,15 @@ model Payment {
 
 model FeeConfig {
   id           Int     @id @default(autoincrement())
-  key          String  @unique // pre_primary, class_1..class_5, ielts_l1.., abacus, deen, debate_club
+  key          String  @unique // pre_primary, class_1..class_5, abacus, deen, debate_club, abacus_l1 ...
   label        String
-  kind         String // REGULAR_CLASS | SPECIAL_COURSE
+  kind         String // REGULAR_CLASS | SPECIAL_COURSE (course-wide default) | SPECIAL_LEVEL (one level of a course)
+  // What this fee is for. A level's own row wins; a course-wide row (courseLevelId null) is the
+  // default for a course without levels, and the fallback for a level with no row of its own.
+  courseId     Int?
+  courseLevelId Int?   @unique
+  course       Course?      @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  level        CourseLevel? @relation(fields: [courseLevelId], references: [id], onDelete: SetNull)
   admissionFee Int     @default(0)
   semesterFee  Int     @default(0)
   bcskPrice    Int? // special course price for BCSK students
@@ -359,6 +374,8 @@ model FeeConfig {
   bookFee      Int?
   displayOrder Int     @default(100)
   active       Boolean @default(true)
+
+  @@index([courseId])
 }
 
 model ContentPage {

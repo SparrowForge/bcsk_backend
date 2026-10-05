@@ -823,6 +823,15 @@ export class AdminService {
     });
   }
 
+  /** The classes of the Regular Course (Pre-Primary, Class 1-5), for the application form. */
+  regularLevels() {
+    return this.prisma.courseLevel.findMany({
+      where: { course: { slug: "regular-course" }, code: { not: null } },
+      select: { id: true, name: true, code: true },
+      orderBy: { displayOrder: "asc" },
+    });
+  }
+
   /** A course page needs its levels and this semester's timetable. */
   courseBySlug(slug: string) {
     return this.prisma.course.findUnique({

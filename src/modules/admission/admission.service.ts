@@ -10,7 +10,11 @@ import { log } from "../../common/logger";
 import { issuePaymentToken, assertPaymentToken } from "../payment/payment-token";
 import { PaymentService } from "../payment/payment.service";
 import type { Actor } from "../../common/actor";
-import type { RegularApplicationInput, SpecialApplicationInput } from "./admission.schema";
+import { Prisma } from "@prisma/client";
+import { SEMESTER_CURRENT } from "../../common/constants";
+import type { ApplicationInput } from "./admission.schema";
+
+type FeePreviewQuery = { type: string; grade?: string; courseName?: string; courseLevelId?: number };
 
 /** GAP-12: the specification restricts admission to children aged 5 and above. */
 const MINIMUM_AGE_YEARS = 5;
@@ -54,81 +58,107 @@ export class AdmissionService {
     return { applicationId, paymentToken: await issuePaymentToken(applicationId) };
   }
 
-  async submitRegular(input: RegularApplicationInput, ip: string) {
+  /**
+   * One entry point for every registration type. The shared applicant fields are written the
+   * same way for all of them; only the type-specific checks and columns differ.
+   */
+  async submit(input: ApplicationInput, ip: string) {
     await this.rateLimit.consume("apply", ip);
     const captcha = await verifyRecaptcha(input.recaptchaToken, "apply");
     if (!captcha.ok) throw unprocessable("Captcha verification failed. Please try again.");
     const dob = this.assertEligible(input.dob);
 
-    const app = await this.prisma.applicationForm.create({
-      data: {
-        type: "REGULAR",
-        applicantName: input.applicantName,
-        dob,
-        gender: input.gender,
-        religion: input.religion,
-        phone: input.phone,
-        email: input.email,
-        photoUrl: input.photoPath,
-        addressKorea: input.addressKorea,
-        addressBangladesh: input.addressBangladesh,
-        emergencyContact: input.emergencyContact,
-        grade: input.grade,
-        fatherName: input.fatherName,
-        motherName: input.motherName,
-        guardianProfession: input.guardianProfession || null,
-        guardianEducation: input.guardianEducation || null,
-        guardianPhone2: input.guardianPhone2 || null,
-        parentalConsent: true,
-      },
-    });
-    log.info("activation", "application_submitted", { applicationId: app.id, type: "REGULAR" });
+    const data: Prisma.ApplicationFormCreateInput = {
+      type: input.type,
+      applicantName: input.applicantName,
+      dob,
+      gender: input.gender,
+      religion: input.religion,
+      phone: input.phone,
+      email: input.email,
+      photoUrl: input.photoPath || null,
+      addressKorea: input.addressKorea || null,
+      addressBangladesh: input.addressBangladesh,
+      emergencyContact: input.emergencyContact,
+      learningMode: input.learningMode ?? null,
+      semester: SEMESTER_CURRENT,
+      parentalConsent: true,
+    };
+
+    if (input.type === "SPECIAL") {
+      // The course used to be stored as whatever string arrived. Check it is a real, open special
+      // course, and that the chosen level belongs to it - activation enrols into that level.
+      const course = await this.prisma.course.findFirst({
+        where: { slug: input.courseName, type: "SPECIAL", active: true },
+        include: { levels: { select: { id: true } } },
+      });
+      if (!course) throw unprocessable("Choose one of the listed courses.");
+      const hasLevels = course.levels.length > 0;
+      if (hasLevels && !course.levels.some((l) => l.id === input.courseLevelId)) {
+        throw unprocessable("Choose a level or track for this course.");
+      }
+      data.courseName = input.courseName;
+      if (hasLevels) data.courseLevel = { connect: { id: input.courseLevelId! } };
+      data.highestEducation = input.highestEducation || null;
+      // SEC-3: the discount claim is persisted here and is the only source the fee
+      // calculation reads. It is never echoed through a URL again.
+      data.isBcskStudent = input.isBcskStudent;
+      data.adminNote = input.isBcskStudent ? "Claims BCSK student rate - verify before approving" : null;
+    } else {
+      const level = await this.regularLevel(input.courseLevelId, input.grade);
+      // Fail early on a class with no fee row rather than at the payment step.
+      await this.payments.feeStructure({ type: input.type, courseLevelId: level.id, grade: level.code ?? undefined });
+      data.courseLevel = { connect: { id: level.id } };
+      // The grade text is what enrolment and the classroom still key on; it follows the level.
+      data.grade = level.code;
+      data.fatherName = input.fatherName || null;
+      data.motherName = input.motherName || null;
+      if (input.type === "REGULAR") {
+        data.guardianProfession = input.guardianProfession || null;
+        data.guardianEducation = input.guardianEducation || null;
+        data.guardianPhone2 = input.guardianPhone2 || null;
+      } else {
+        data.studentId = await this.verifyReturningStudent(input.studentId, input.applicantName);
+      }
+    }
+
+    const app = await this.prisma.applicationForm.create({ data });
+    log.info("activation", "application_submitted", { applicationId: app.id, type: input.type });
     return this.issued(app.id);
   }
 
-  async submitSpecial(input: SpecialApplicationInput, ip: string) {
-    await this.rateLimit.consume("apply", ip);
-    const captcha = await verifyRecaptcha(input.recaptchaToken, "apply");
-    if (!captcha.ok) throw unprocessable("Captcha verification failed. Please try again.");
-    const dob = this.assertEligible(input.dob);
-
-    // The course used to be stored as whatever string arrived. Check it is a real, open special
-    // course, and that the chosen level belongs to it — activation enrols into that level.
-    const course = await this.prisma.course.findFirst({
-      where: { slug: input.courseName, type: "SPECIAL", active: true },
-      include: { levels: { select: { id: true } } },
-    });
-    if (!course) throw unprocessable("Choose one of the listed courses.");
-    const hasLevels = course.levels.length > 0;
-    if (hasLevels && !course.levels.some((l) => l.id === input.courseLevelId)) {
-      throw unprocessable("Choose a level or track for this course.");
-    }
-
-    const app = await this.prisma.applicationForm.create({
-      data: {
-        type: "SPECIAL",
-        applicantName: input.applicantName,
-        dob,
-        gender: input.gender,
-        religion: input.religion,
-        phone: input.phone,
-        email: input.email,
-        photoUrl: input.photoPath,
-        addressKorea: input.addressKorea || null,
-        addressBangladesh: input.addressBangladesh,
-        emergencyContact: input.emergencyContact,
-        courseName: input.courseName,
-        courseLevelId: hasLevels ? input.courseLevelId : null,
-        highestEducation: input.highestEducation || null,
-        parentalConsent: true,
-        // SEC-3: the discount claim is persisted here and is the only source the fee
-        // calculation reads. It is never echoed through a URL again.
-        isBcskStudent: input.isBcskStudent,
-        adminNote: input.isBcskStudent ? "Claims BCSK student rate - verify before approving" : null,
+  /** A class of the Regular Course, by level id or (older callers) by its grade code. */
+  private async regularLevel(courseLevelId?: number, grade?: string) {
+    const level = await this.prisma.courseLevel.findFirst({
+      where: {
+        course: { slug: "regular-course" },
+        ...(courseLevelId ? { id: courseLevelId } : { code: grade ?? "" }),
       },
     });
-    log.info("activation", "application_submitted", { applicationId: app.id, type: "SPECIAL" });
-    return this.issued(app.id);
+    if (!level?.code) throw unprocessable("Choose a class.");
+    return level;
+  }
+
+  /**
+   * A re-admission skips the admission fee, so the claim to be a returning student has to be
+   * true. The ID alone is not enough - it is not secret - so the name must match too, and the
+   * two failures give one answer so the form cannot be used to probe which IDs exist.
+   */
+  private async verifyReturningStudent(studentId: string, name: string): Promise<string> {
+    const profile = await this.prisma.studentProfile.findUnique({
+      where: { studentId: studentId.toUpperCase() },
+      include: { user: { select: { name: true, active: true } } },
+    });
+    const norm = (v: string) => v.trim().replace(/s+/g, " ").toLowerCase();
+    if (!profile || !profile.user.active || norm(profile.user.name) !== norm(name) || profile.classLevel === "SPECIAL") {
+      throw unprocessable("We could not match that Student ID and name to a current BCSK regular student.");
+    }
+    return profile.studentId;
+  }
+
+  /** The fee table the form shows for a chosen grade or course. */
+  feePreview(q: FeePreviewQuery) {
+    return this.payments.feeStructure(q);
   }
 
   /**
@@ -152,6 +182,7 @@ export class AdmissionService {
       email: app.email,
       courseName: app.courseName,
       grade: app.grade,
+      semester: app.semester,
       payments: app.payments,
     };
   }
