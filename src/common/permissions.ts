@@ -29,6 +29,7 @@ export const PERMISSIONS = [
   "leads:read", // CRM: view leads, pipeline, follow-ups, reports
   "leads:manage", // CRM: create/edit leads, move stages, assign, convert, manage sources
   "coupons:manage", // discount coupons for the admission form
+  "permissions:manage", // per-user menu permissions - super admin only, never grantable
   "users:manage",
   "settings:manage",
   "audit:read",
@@ -94,6 +95,7 @@ export const ADMIN_NAV: { href: string; label: string; permission: Permission | 
   { href: "/admin/courses", label: "Courses & Levels", permission: "courses:manage" },
   { href: "/admin/scheduling", label: "Scheduling", permission: "scheduling:manage" },
   { href: "/admin/users", label: "Users", permission: "users:manage" },
+  { href: "/admin/user-permissions", label: "Menu Permissions", permission: "permissions:manage" },
   { href: "/admin/reports", label: "Reports", permission: "reports:manage" },
   { href: "/admin/tickets", label: "Support Tickets", permission: "tickets:manage" },
   { href: "/admin/settings", label: "Settings", permission: "settings:manage" },

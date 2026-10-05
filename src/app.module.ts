@@ -21,6 +21,7 @@ import { DocumentModule } from "./modules/document/document.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { LeadsModule } from "./modules/leads/leads.module";
 import { CouponModule } from "./modules/coupon/coupon.module";
+import { UserPermissionModule } from "./modules/user-permission/user-permission.module";
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { CouponModule } from "./modules/coupon/coupon.module";
     AdminModule,
     LeadsModule,
     CouponModule,
+    UserPermissionModule,
     HealthModule,
   ],
   providers: [

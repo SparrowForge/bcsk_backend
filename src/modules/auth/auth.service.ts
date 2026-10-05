@@ -11,6 +11,7 @@ import { unprocessable } from "../../common/errors/app-error";
 import { SignJWT, jwtVerify } from "../../common/jose";
 import type { Role } from "../../common/constants";
 import type { Actor, ActorTransport } from "../../common/actor";
+import { effectivePermissions } from "../../common/menu-permissions";
 
 /**
  * Authentication for both transports.
@@ -159,7 +160,13 @@ export class AuthService {
       const userId = Number(payload.sub);
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { active: true, mustChangePassword: true },
+        select: {
+          active: true,
+          mustChangePassword: true,
+          // The per-user menu grid rides along on the lookup this already does, so custom
+          // permissions cost no extra round trip.
+          menuPermissions: { select: { menuKey: true, canAccess: true, canInsert: true, canUpdate: true, canDelete: true } },
+        },
       });
       if (!user?.active) return null;
       return {
@@ -169,6 +176,7 @@ export class AuthService {
         name: payload.name as string,
         mustChangePassword: user.mustChangePassword,
         transport,
+        permissions: effectivePermissions(payload.role as Role, user.menuPermissions),
       };
     } catch {
       return null;

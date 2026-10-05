@@ -3,10 +3,10 @@ import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
 import { IS_PUBLIC, REQUIRED_PERMISSION } from "../decorators/actor.decorator";
 import { AuthService } from "../../modules/auth/auth.service";
-import { roleHas, type Permission } from "../permissions";
+import type { Permission } from "../permissions";
 import { forbidden, unauthenticated } from "../errors/app-error";
 import { log } from "../logger";
-import type { Actor } from "../actor";
+import { actorHas, type Actor } from "../actor";
 
 /**
  * Registered globally in AppModule, so **every** route is authenticated unless it is
@@ -39,14 +39,14 @@ export class AuthGuard implements CanActivate {
       REQUIRED_PERMISSION,
       targets,
     );
-    if (required && !roleHas(actor.role, required)) {
+    if (required && !actorHas(actor, required)) {
       log.warn("auth", "api_permission_denied", {
         route: req.originalUrl,
         userId: actor.userId,
         role: actor.role,
         permission: required,
       });
-      throw forbidden("Your role doesn't have access to this.");
+      throw forbidden("You don't have access to this.");
     }
     return true;
   }

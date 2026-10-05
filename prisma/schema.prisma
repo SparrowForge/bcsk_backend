@@ -62,6 +62,7 @@ model User {
   refreshTokens  RefreshToken[]
   assignedLeads Lead[]         @relation("LeadOwner")
   leadActivities LeadActivity[]
+  menuPermissions UserMenuPermission[]
 }
 
 /**
@@ -752,4 +753,26 @@ model Coupon {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   applications ApplicationForm[]
+}
+
+/**
+ * Per-user menu permissions (admin staff). A user with no rows here gets their role's default
+ * permissions; a user with rows gets exactly what the grid grants, whatever the role says.
+ * Saving the grid always writes a row for every menu, so "present but all false" is a real,
+ * deliberate lock-down rather than being mistaken for "no custom setting".
+ * What each flag grants is defined in the menu catalog in common/permissions.ts - this table
+ * stores only the four switches.
+ */
+model UserMenuPermission {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  menuKey   String
+  canAccess Boolean  @default(false)
+  canInsert Boolean  @default(false)
+  canUpdate Boolean  @default(false)
+  canDelete Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, menuKey])
 }

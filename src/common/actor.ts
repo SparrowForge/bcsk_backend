@@ -1,5 +1,5 @@
 import { ADMIN_ROLES, type Role } from "./constants";
-import { roleHas, type Permission } from "./permissions";
+import { permissionsFor, type Permission } from "./permissions";
 import { forbidden, unauthenticated } from "./errors/app-error";
 
 /**
@@ -23,7 +23,18 @@ export type Actor = {
   /** SEC-2: credential was issued by the office and has not yet been replaced by its holder. */
   mustChangePassword: boolean;
   transport: ActorTransport;
+  /**
+   * What this person may do right now: their saved menu permissions if a super admin set any,
+   * otherwise their role's defaults. Resolved once per request alongside the live `active`
+   * check. Read it through `actorHas` - never `roleHas(actor.role, ...)`, which ignores the
+   * per-user grid.
+   */
+  permissions?: readonly Permission[];
 };
+
+/** The one place a capability is checked against an actor. */
+export const actorHas = (actor: Actor, permission: Permission): boolean =>
+  (actor.permissions ?? permissionsFor(actor.role)).includes(permission);
 
 /** An unauthenticated caller. Public reads accept this; everything else must reject it. */
 export type MaybeActor = Actor | null;
@@ -48,7 +59,7 @@ export const isStudent = (actor: MaybeActor): actor is Actor => actor?.role === 
 export const isTeacher = (actor: MaybeActor): actor is Actor => actor?.role === "TEACHER";
 
 export const can = (actor: MaybeActor, permission: Permission): boolean =>
-  actor !== null && roleHas(actor.role, permission);
+  actor !== null && actorHas(actor, permission);
 
 /** Narrow to an authenticated actor or throw. */
 export function requireActor(actor: MaybeActor): Actor {
@@ -62,7 +73,7 @@ export function requireActor(actor: MaybeActor): Actor {
  */
 export function requireCan(actor: MaybeActor, permission: Permission): Actor {
   const a = requireActor(actor);
-  if (!roleHas(a.role, permission)) {
+  if (!actorHas(a, permission)) {
     throw forbidden("Your role doesn't have access to this.", { permission });
   }
   return a;
@@ -79,6 +90,6 @@ export function requireOwnerOr(
   override: Permission
 ): Actor {
   const a = requireActor(actor);
-  if (a.userId === ownerUserId || roleHas(a.role, override)) return a;
+  if (a.userId === ownerUserId || actorHas(a, override)) return a;
   throw forbidden();
 }

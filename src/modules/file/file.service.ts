@@ -4,7 +4,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { PrismaService } from "../../database/prisma.service";
 import { intFromEnv } from "../../config/env";
 import { forbidden, notFound, unprocessable, misconfigured } from "../../common/errors/app-error";
-import { roleHas } from "../../common/permissions";
+import { actorHas } from "../../common/actor";
 import { log, errMessage } from "../../common/logger";
 import type { Actor, MaybeActor } from "../../common/actor";
 
@@ -28,7 +28,7 @@ const EXT: Record<string, string> = {
 
 type Decision = "public" | ((actor: Actor, segments: string[]) => boolean);
 
-const isStaffReader = (a: Actor) => roleHas(a.role, "admissions:read") || roleHas(a.role, "payments:read");
+const isStaffReader = (a: Actor) => actorHas(a, "admissions:read") || actorHas(a, "payments:read");
 
 function ownerOnly(allowStaff: boolean): Decision {
   return (actor, segments) => {
@@ -45,8 +45,8 @@ const POLICY: Record<string, Decision> = {
   news: "public",
   governing: "public",
   "student-corner": "public",
-  applications: (a) => roleHas(a.role, "admissions:read"),
-  receipts: (a) => roleHas(a.role, "payments:read"),
+  applications: (a) => actorHas(a, "admissions:read"),
+  receipts: (a) => actorHas(a, "payments:read"),
   books: (a) => a.role === "STUDENT" || a.role === "TEACHER" || isStaffReader(a),
   assignments: (a) => a.role === "STUDENT" || a.role === "TEACHER" || isStaffReader(a),
   "class-videos": (a) => a.role === "STUDENT" || a.role === "TEACHER" || isStaffReader(a),

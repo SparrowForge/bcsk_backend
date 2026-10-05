@@ -5,7 +5,7 @@ import { PrismaService } from "../../database/prisma.service";
 import { certificatePdf, idCardPdf, resultSheetPdf, receiptPdf } from "../../common/pdf";
 import { SEMESTER_CURRENT, classLevelLabel } from "../../common/constants";
 import { forbidden, notFound, unprocessable } from "../../common/errors/app-error";
-import { roleHas } from "../../common/permissions";
+import { actorHas } from "../../common/actor";
 import type { Actor } from "../../common/actor";
 
 export type DocumentType = "certificate" | "id-card" | "result-sheet";
@@ -52,7 +52,7 @@ export class DocumentService {
    * checked here rather than in the controller, so neither entry point can forget it.
    */
   async generate(actor: Actor, studentUserId: number, type: DocumentType): Promise<{ filename: string; pdf: Buffer }> {
-    if (actor.userId !== studentUserId && !roleHas(actor.role, "reports:manage")) {
+    if (actor.userId !== studentUserId && !actorHas(actor, "reports:manage")) {
       throw forbidden();
     }
 
@@ -150,7 +150,7 @@ export class DocumentService {
     const isOwner =
       payment.payerUserId === actor.userId ||
       payment.application?.createdStudentUserId === actor.userId;
-    if (!isOwner && !roleHas(actor.role, "payments:read")) throw forbidden();
+    if (!isOwner && !actorHas(actor, "payments:read")) throw forbidden();
 
     if (!["PAID", "VERIFIED", "REFUNDED"].includes(payment.status)) {
       throw unprocessable("A receipt is available once the payment is confirmed.");

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { AuthService, SESSION_COOKIE } from "./auth.service";
 import { RefreshTokenService } from "./refresh-token.service";
 import { CurrentActor, Public } from "../../common/decorators/actor.decorator";
-import { permissionsFor } from "../../common/permissions";
+import { actorHas } from "../../common/actor";
+import { PERMISSIONS } from "../../common/permissions";
 import { unauthenticated } from "../../common/errors/app-error";
 import { ADMIN_ROLES, type Role } from "../../common/constants";
 import type { Actor } from "../../common/actor";
@@ -143,7 +144,7 @@ export class AuthController {
       role: actor.role,
       name: actor.name,
       mustChangePassword: actor.mustChangePassword,
-      permissions: permissionsFor(actor.role),
+      permissions: PERMISSIONS.filter((p) => actorHas(actor, p)),
     };
   }
 }
