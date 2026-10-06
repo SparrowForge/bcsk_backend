@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../database/prisma.service";
 import { forbidden, notFound, unprocessable } from "../../common/errors/app-error";
-import { SEMESTER_CURRENT } from "../../common/constants";
+import { SEMESTER_CURRENT, schoolToday } from "../../common/constants";
 import type { Actor } from "../../common/actor";
 
 /** Attendance values are validated server-side, never trusted from a form. */
@@ -90,8 +90,9 @@ export class OfficeService {
 
   async classDetail(actor: Actor, classSessionId: number) {
     const cs = await this.ownSession(actor, classSessionId);
-    const today = new Date();
-    const todayUtc = new Date(`${today.toISOString().slice(0, 10)}T00:00:00Z`);
+    // Attendance rows are keyed by the school's calendar day (Korea). Taking "today" from the UTC
+    // date showed the previous day's sheet between 00:00 and 09:00 KST.
+    const todayUtc = new Date(`${schoolToday()}T00:00:00Z`);
     const [roster, assignments, videos, todayAttendance] = await Promise.all([
       this.prisma.enrollment.findMany({
         where: { classSessionId: cs.id, status: "ACTIVE" },

@@ -4,3 +4,7 @@ dist
 *.tsbuildinfo
 coverage
 src/vendor
+
+# credentials printed by db:seed / db:rotate-passwords - never commit
+seeded-credentials-*.txt
+rotated-credentials-*.txt

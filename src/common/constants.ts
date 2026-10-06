@@ -84,3 +84,7 @@ export const SCHOOL = {
   },
   facebook: "https://www.facebook.com/bcsk.edu",
 } as const;
+
+/** The school's calendar day (Korea) as YYYY-MM-DD. Day-keyed records use it, never the UTC date. */
+export const schoolToday = (now = new Date()) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(now);
