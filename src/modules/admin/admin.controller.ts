@@ -120,6 +120,29 @@ export class AdminController {
     return this.admin.deleteMember(idParam.parse(raw), a);
   }
 
+  /* --------------------------- teacher profiles ----------------------------- */
+
+  // The public face of each teacher — photo, designation, subjects, bio — as the homepage
+  // teacher panel and the Teachers page show it. Content, so it sits under `cms:manage`;
+  // accounts themselves stay under Users.
+  @RequirePermission("cms:manage") @Get("teacher-profiles")
+  listTeacherProfiles() { return this.admin.listTeacherProfiles(); }
+
+  @RequirePermission("cms:manage") @Patch("teacher-profiles/:id")
+  updateTeacherProfile(@Param("id") raw: string, @Body() body: unknown, @CurrentActor() a: Actor) {
+    const text = (max: number) => z.string().trim().max(max).nullish();
+    const input = z.object({
+      designation: text(120),
+      subjects: text(200),
+      bio: text(1500),
+      // Only a path our own upload endpoint issued: never an arbitrary URL on a public page.
+      photoUrl: z.string().regex(/^\/api\/files\/[\w\-./]+$/).nullish(),
+      isPublic: z.boolean().optional(),
+      displayOrder: z.coerce.number().int().min(0).max(10_000).optional(),
+    }).parse(body);
+    return this.admin.updateTeacherProfile(idParam.parse(raw), input, a);
+  }
+
   /* ---------------------------- student corner ----------------------------- */
 
   @RequirePermission("corner:manage") @Get("student-corner")

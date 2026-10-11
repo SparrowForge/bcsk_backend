@@ -226,7 +226,7 @@ async function main() {
       slug: "ielts-for-kids",
       name: "IELTS for Kids",
       category: "ielts",
-      desc: "The four core English skills — Listening, Speaking, Reading, and Writing — taught by native English speakers across nine progressive levels.",
+      desc: "The four core English skills — Listening, Speaking, Reading, and Writing — taught by native English speakers across ten progressive levels.",
       hero: "Give your child a global voice — IELTS foundations taught by native speakers.",
     },
     {
@@ -287,8 +287,8 @@ async function main() {
       });
   }
 
-  // IELTS levels 1-9
-  for (let i = 1; i <= 9; i++) {
+  // IELTS levels 1-10 (the school moved from nine to ten in Oct 2026; Level 10 is exam readiness)
+  for (let i = 1; i <= 10; i++) {
     const name = `Level ${i}`;
     const exists = await db.courseLevel.findFirst({ where: { courseId: courseIds["ielts-for-kids"], name } });
     if (!exists)
@@ -302,7 +302,9 @@ async function main() {
               ? `Foundations ${i}: phonics and listening comprehension, simple conversations, picture reading, guided sentence writing.`
               : i <= 6
               ? `Development ${i}: paragraph reading, structured speaking topics, listening to native dialogues, short essay writing.`
-              : `Mastery ${i}: mock IELTS tasks across all four skills, band-score practice, academic vocabulary, timed writing.`,
+              : i <= 9
+              ? `Mastery ${i}: mock IELTS tasks across all four skills, band-score practice, academic vocabulary, timed writing.`
+              : `Exam Ready ${i}: full-length IELTS-style practice tests, band-score feedback, exam strategies and test-day confidence.`,
         },
       });
   }

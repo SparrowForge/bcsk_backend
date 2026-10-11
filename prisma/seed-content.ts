@@ -195,7 +195,7 @@ Classes run online on weekends and weekday evenings. Each semester includes asse
 
 Open to both BCSK students and non-BCSK students (differentiated fees apply):
 
-- **IELTS for Kids** — Listening, Speaking, Reading, Writing taught by native English speakers, Levels 1–9.
+- **IELTS for Kids** — Listening, Speaking, Reading, Writing taught by native English speakers, Levels 1–10.
 - **Abacus** — mental arithmetic from Level 0 to Level 7 with our interactive virtual abacus and games.
 - **Qur'an & Islamic Studies (Deen)** — Tajweed-based recitation in separate boys'/girls' tracks, plus the KOIE program.
 - **Hifz Program** — structured Qur'an memorization with per-surah progress tracking.

@@ -225,6 +225,53 @@ export class AdminService {
     return { ok: true };
   }
 
+  /* --------------------------- teacher profiles ----------------------------- */
+
+  /** Shaped explicitly: the editor needs the public fields and the name, not the account. */
+  async listTeacherProfiles() {
+    const rows = await this.prisma.teacherProfile.findMany({
+      select: {
+        id: true, teacherId: true, designation: true, subjects: true, bio: true,
+        photoUrl: true, isPublic: true, displayOrder: true,
+        user: { select: { name: true } },
+      },
+      orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+    });
+    return rows.map(({ user, ...r }) => ({ ...r, name: user.name }));
+  }
+
+  async updateTeacherProfile(
+    id: number,
+    input: {
+      designation?: string | null;
+      subjects?: string | null;
+      bio?: string | null;
+      photoUrl?: string | null;
+      isPublic?: boolean;
+      displayOrder?: number;
+    },
+    actor: Actor,
+  ) {
+    const exists = await this.prisma.teacherProfile.findUnique({ where: { id }, select: { id: true } });
+    if (!exists) throw notFound("Teacher not found.");
+    // An empty field clears it; a field left out of the request is left alone.
+    const blankToNull = (v: string | null | undefined) => (v === undefined ? undefined : v?.trim() || null);
+    const row = await this.prisma.teacherProfile.update({
+      where: { id },
+      data: {
+        designation: blankToNull(input.designation),
+        subjects: blankToNull(input.subjects),
+        bio: blankToNull(input.bio),
+        photoUrl: input.photoUrl === undefined ? undefined : input.photoUrl || null,
+        isPublic: input.isPublic,
+        displayOrder: input.displayOrder,
+      },
+      select: { id: true, teacherId: true },
+    });
+    await this.audit.record(actor.userId, "CONTENT_EDIT", "TeacherProfile", id, row.teacherId);
+    return row;
+  }
+
   /* ---------------------------- student corner ----------------------------- */
 
   listCornerPosts() {
