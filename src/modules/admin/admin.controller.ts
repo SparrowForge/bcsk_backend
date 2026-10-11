@@ -7,6 +7,8 @@ import type { Actor } from "../../common/actor";
 
 const idParam = z.coerce.number().int().positive();
 const reason = z.object({ reason: z.string().trim().min(1) });
+/** A slider position: 1 shows first. */
+const heroOrder = z.coerce.number().int().min(0).max(9999);
 
 @Roles(...ADMIN_ROLES)
 @Controller("admin")
@@ -96,8 +98,23 @@ export class AdminController {
 
   @RequirePermission("slider:manage") @Post("hero-images")
   addHeroImage(@Body() body: unknown, @CurrentActor() a: Actor) {
-    const { url, caption } = z.object({ url: z.string(), caption: z.string().nullish() }).parse(body);
-    return this.admin.addHeroImage(url, caption ?? null, a);
+    const { url, caption, displayOrder, active } = z.object({
+      url: z.string(),
+      caption: z.string().nullish(),
+      displayOrder: heroOrder.optional(),
+      active: z.boolean().optional(),
+    }).parse(body);
+    return this.admin.addHeroImage(url, caption ?? null, { displayOrder, active }, a);
+  }
+
+  @RequirePermission("slider:manage") @Patch("hero-images/:id")
+  updateHeroImage(@Param("id") raw: string, @Body() body: unknown, @CurrentActor() a: Actor) {
+    const input = z.object({
+      caption: z.string().max(200).nullish(),
+      displayOrder: heroOrder.optional(),
+      active: z.boolean().optional(),
+    }).parse(body);
+    return this.admin.updateHeroImage(idParam.parse(raw), input, a);
   }
 
   @RequirePermission("slider:manage") @Delete("hero-images/:id")

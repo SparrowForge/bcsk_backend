@@ -155,7 +155,14 @@ export class AdminService {
 
   /* ----------------------------- hero slider -------------------------------- */
 
-  static readonly HERO_IMAGE_LIMIT = 5;
+  /**
+   * At most this many images rotate on the homepage at once — a hero that takes a minute to
+   * come round again stops reading as a slider. Inactive images do not count, so the school
+   * can keep a season's photos switched off and bring them back later.
+   */
+  static readonly HERO_ACTIVE_LIMIT = 5;
+  /** Everything stored, active or not: a ceiling so the list cannot grow without bound. */
+  static readonly HERO_IMAGE_LIMIT = 20;
 
   listHeroImages() {
     return this.prisma.heroImage.findMany({ orderBy: [{ displayOrder: "asc" }, { id: "asc" }] });
@@ -169,21 +176,60 @@ export class AdminService {
     });
   }
 
-  async addHeroImage(url: string, caption: string | null, actor: Actor) {
+  private async assertActiveRoom(exceptId?: number) {
+    const active = await this.prisma.heroImage.count({
+      where: { active: true, ...(exceptId ? { id: { not: exceptId } } : {}) },
+    });
+    if (active >= AdminService.HERO_ACTIVE_LIMIT) {
+      throw conflict(
+        `At most ${AdminService.HERO_ACTIVE_LIMIT} images can be active at once — make one inactive first.`,
+      );
+    }
+  }
+
+  async addHeroImage(
+    url: string,
+    caption: string | null,
+    opts: { displayOrder?: number; active?: boolean },
+    actor: Actor,
+  ) {
     // Capped server-side, not just in the admin UI — a direct POST past a hidden/removed
     // button would otherwise let the slider grow without bound.
+    const active = opts.active ?? true;
     const [count, last] = await Promise.all([
       this.prisma.heroImage.count(),
       this.prisma.heroImage.findFirst({ orderBy: { displayOrder: "desc" } }),
     ]);
     if (count >= AdminService.HERO_IMAGE_LIMIT) {
-      throw conflict(`The homepage slider holds at most ${AdminService.HERO_IMAGE_LIMIT} images — remove one first.`);
+      throw conflict(`The homepage slider stores at most ${AdminService.HERO_IMAGE_LIMIT} images — remove one first.`);
     }
-    // max(displayOrder) + 1, not count — a delete-then-add sequence would otherwise hand out
-    // a displayOrder that an existing row already has.
-    const displayOrder = (last?.displayOrder ?? -1) + 1;
-    const image = await this.prisma.heroImage.create({ data: { url, caption, displayOrder } });
+    if (active) await this.assertActiveRoom();
+    // Without an order the image goes last: max(displayOrder) + 1, not count — a
+    // delete-then-add sequence would otherwise hand out an order an existing row already has.
+    const displayOrder = opts.displayOrder ?? (last?.displayOrder ?? 0) + 1;
+    const image = await this.prisma.heroImage.create({ data: { url, caption, displayOrder, active } });
     await this.audit.record(actor.userId, "HERO_IMAGE_UPLOAD", "HeroImage", image.id);
+    return image;
+  }
+
+  /** Caption, position and on/off for one slider image; a field left out is left alone. */
+  async updateHeroImage(
+    id: number,
+    input: { caption?: string | null; displayOrder?: number; active?: boolean },
+    actor: Actor,
+  ) {
+    const row = await this.prisma.heroImage.findUnique({ where: { id }, select: { active: true } });
+    if (!row) throw notFound("Slider image not found.");
+    if (input.active && !row.active) await this.assertActiveRoom(id);
+    const image = await this.prisma.heroImage.update({
+      where: { id },
+      data: {
+        caption: input.caption === undefined ? undefined : input.caption?.trim() || null,
+        displayOrder: input.displayOrder,
+        active: input.active,
+      },
+    });
+    await this.audit.record(actor.userId, "HERO_IMAGE_UPDATE", "HeroImage", id);
     return image;
   }
 
