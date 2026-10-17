@@ -9,6 +9,12 @@ const idParam = z.coerce.number().int().positive();
 const reason = z.object({ reason: z.string().trim().min(1) });
 /** A slider position: 1 shows first. */
 const heroOrder = z.coerce.number().int().min(0).max(9999);
+/**
+ * A picture on a public page: only a path our own upload endpoint issued, never an arbitrary
+ * URL. `undefined` leaves the stored picture alone and `null` removes it, so an edit that does
+ * not touch the photo cannot wipe it.
+ */
+const ownFileUrl = z.string().regex(/^\/api\/files\/[\w\-./]+$/).nullish();
 
 @Roles(...ADMIN_ROLES)
 @Controller("admin")
@@ -53,6 +59,7 @@ export class AdminController {
       id: z.coerce.number().int().positive().optional(),
       type: z.string(), title: z.string(), body: z.string(),
       date: z.string(), published: z.boolean(),
+      imageUrl: ownFileUrl,
     }).parse(body);
     return this.admin.saveNews(input, a);
   }
@@ -153,7 +160,7 @@ export class AdminController {
       subjects: text(200),
       bio: text(1500),
       // Only a path our own upload endpoint issued: never an arbitrary URL on a public page.
-      photoUrl: z.string().regex(/^\/api\/files\/[\w\-./]+$/).nullish(),
+      photoUrl: ownFileUrl,
       isPublic: z.boolean().optional(),
       displayOrder: z.coerce.number().int().min(0).max(10_000).optional(),
     }).parse(body);
@@ -170,7 +177,10 @@ export class AdminController {
     const input = z.object({
       id: z.coerce.number().int().positive().optional(),
       title: z.string(), body: z.string(), studentName: z.string(),
-      kind: z.string(), published: z.boolean(),
+      // Free text rather than an enum: the school adds new kinds of work (handicrafts, science
+      // projects, ...) as they come, without a deploy. The service turns it into a stable key.
+      kind: z.string().trim().min(1).max(40), published: z.boolean(),
+      imageUrl: ownFileUrl,
     }).parse(body);
     return this.admin.saveCornerPost(input, a);
   }

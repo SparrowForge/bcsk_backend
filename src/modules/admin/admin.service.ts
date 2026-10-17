@@ -10,6 +10,21 @@ import { log } from "../../common/logger";
 import type { Actor } from "../../common/actor";
 
 /**
+ * A Student Corner kind as a stable key: "Handy crafts" and "HANDY_CRAFTS" are one kind, so
+ * the homepage colours and filters them together. The set is open on purpose (October 2026):
+ * the school adds kinds of extra-curricular work as they come. Letters in any script survive,
+ * so a kind typed in Bangla still works. An empty result means nothing usable was typed.
+ */
+export function cornerKindKey(raw: string): string {
+  return raw
+    .trim()
+    .replace(/[^\p{L}\p{N}]+/gu, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase()
+    .slice(0, 40);
+}
+
+/**
  * The Admin Panel's read and write surface.
  *
  * Grouped into one module rather than eleven because these are small CRUD operations over
@@ -98,7 +113,10 @@ export class AdminService {
   }
 
   async saveNews(
-    input: { id?: number; type: string; title: string; body: string; date: string; published: boolean },
+    input: {
+      id?: number; type: string; title: string; body: string; date: string; published: boolean;
+      imageUrl?: string | null;
+    },
     actor: Actor,
   ) {
     if (!input.title.trim() || !input.body.trim()) throw unprocessable("Title and body are required.");
@@ -108,6 +126,8 @@ export class AdminService {
       body: input.body,
       date: new Date(input.date),
       published: input.published,
+      // Absent keeps the current picture: Prisma skips an undefined field.
+      imageUrl: input.imageUrl,
     };
     const row = input.id
       ? await this.prisma.eventNews.update({ where: { id: input.id }, data })
@@ -325,15 +345,22 @@ export class AdminService {
   }
 
   async saveCornerPost(
-    input: { id?: number; title: string; body: string; studentName: string; kind: string; published: boolean },
+    input: {
+      id?: number; title: string; body: string; studentName: string; kind: string; published: boolean;
+      imageUrl?: string | null;
+    },
     actor: Actor,
   ) {
     if (!input.title.trim() || !input.body.trim() || !input.studentName.trim()) {
       throw unprocessable("Title, body, and student name are required.");
     }
+    const kind = cornerKindKey(input.kind);
+    if (!kind) throw unprocessable("Say what kind of work this is.");
     const data = {
       title: input.title, body: input.body, studentName: input.studentName,
-      kind: input.kind, published: input.published,
+      kind, published: input.published,
+      // Absent keeps the current picture: Prisma skips an undefined field.
+      imageUrl: input.imageUrl,
     };
     const row = input.id
       ? await this.prisma.studentCornerPost.update({ where: { id: input.id }, data })

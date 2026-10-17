@@ -10,21 +10,21 @@ const pages: Page[] = [
     lang: "en",
     title: "First Bangladeshi School in Korea",
     content:
-      "Established with the motto **“Quality & Moral Education”**, Bangladesh Community School, Korea began serving in 2022 with 35 students across three classes — Pre-Primary to Class 2. Three years on it is a family of 120+ students from Pre-Primary to Class 5, and it offers special courses in IELTS for Kids, Abacus, Debate Club, and Qur’an for a range of ages including Qur’an Hifz.",
+      "Established with the motto **“Quality & Moral Education”**, Bangladesh Community School began serving in 2022 with 35 students across three classes — Pre-Primary to Class 2. Three years on it is a family of 120+ students from Pre-Primary to Class 5, and it offers special courses in IELTS for Kids, Abacus, Debate Club, and Qur’an for a range of ages including Qur’an Hifz.",
   },
   {
     slug: "home-hero",
     lang: "bn",
     title: "কোরিয়ার প্রথম বাংলাদেশি স্কুল",
     content:
-      "**“গুণগত ও নৈতিক শিক্ষা”** মোটো নিয়ে প্রতিষ্ঠিত বাংলাদেশ কমিউনিটি স্কুল, কোরিয়া ২০২২ সালে মাত্র ৩৫ জন শিক্ষার্থী ও তিনটি শ্রেণি — প্রি-প্রাইমারি থেকে দ্বিতীয় শ্রেণি — নিয়ে যাত্রা শুরু করে। তিন বছর পর এখন এটি প্রি-প্রাইমারি থেকে পঞ্চম শ্রেণি পর্যন্ত ১২০+ শিক্ষার্থীর এক বিশাল পরিবার। এর সাথে রয়েছে শিশুদের IELTS, অ্যাবাকাস, বিতর্ক ক্লাব এবং সকল বয়সের জন্য কুরআন ও কুরআন হিফজসহ বিশেষ কোর্স।",
+      "**“গুণগত ও নৈতিক শিক্ষা”** মোটো নিয়ে প্রতিষ্ঠিত বাংলাদেশ কমিউনিটি স্কুল ২০২২ সালে মাত্র ৩৫ জন শিক্ষার্থী ও তিনটি শ্রেণি — প্রি-প্রাইমারি থেকে দ্বিতীয় শ্রেণি — নিয়ে যাত্রা শুরু করে। তিন বছর পর এখন এটি প্রি-প্রাইমারি থেকে পঞ্চম শ্রেণি পর্যন্ত ১২০+ শিক্ষার্থীর এক বিশাল পরিবার। এর সাথে রয়েছে শিশুদের IELTS, অ্যাবাকাস, বিতর্ক ক্লাব এবং সকল বয়সের জন্য কুরআন ও কুরআন হিফজসহ বিশেষ কোর্স।",
   },
   {
     slug: "home-hero",
     lang: "ko",
     title: "한국 최초의 방글라데시 학교",
     content:
-      "**“질 높은 교육과 도덕 교육”**을 교훈으로 설립된 방글라데시 커뮤니티 스쿨 코리아는 2022년 학생 35명과 세 개 학급—프리프라이머리부터 2학년까지—로 문을 열었습니다. 3년이 지난 지금은 프리프라이머리부터 5학년까지 120명 이상의 학생이 함께하는 큰 가족입니다. 또한 어린이 IELTS, 주판, 토론 동아리, 그리고 다양한 연령대를 위한 쿠란 및 쿠란 히프즈 등 특별 과정을 운영합니다.",
+      "**“질 높은 교육과 도덕 교육”**을 교훈으로 설립된 방글라데시 커뮤니티 스쿨은 2022년 학생 35명과 세 개 학급—프리프라이머리부터 2학년까지—로 문을 열었습니다. 3년이 지난 지금은 프리프라이머리부터 5학년까지 120명 이상의 학생이 함께하는 큰 가족입니다. 또한 어린이 IELTS, 주판, 토론 동아리, 그리고 다양한 연령대를 위한 쿠란 및 쿠란 히프즈 등 특별 과정을 운영합니다.",
   },
 
   /* ------------ About ------------ */
@@ -34,7 +34,7 @@ const pages: Page[] = [
     title: "About Us",
     content: `## The First Bangladeshi School in Korea
 
-Bangladesh Community School, Korea (BCSK) is the first educational institution established for the children of the Bangladeshi expatriate community in South Korea. Despite the presence of Bangladeshis in South Korea for over 30 years, no educational institution had been established to introduce our children to our own educational culture — until BCSK.
+Bangladesh Community School (BCSK) is the first educational institution established for the children of the Bangladeshi expatriate community in South Korea. Despite the presence of Bangladeshis in South Korea for over 30 years, no educational institution had been established to introduce our children to our own educational culture — until BCSK.
 
 The institution began its journey with the aim of **connecting the next generation with the mainstream education of Bangladesh**, following the updated NCTB (National Curriculum and Textbook Board) curriculum from Pre-Primary through Class 5, alongside special programs in Qur'an & Islamic studies, IELTS for Kids, Abacus mental arithmetic, and debate.
 
@@ -53,7 +53,7 @@ We hope that today's little children will grow to build the golden Bangladesh of
     title: "আমাদের সম্পর্কে",
     content: `## কোরিয়ার প্রথম বাংলাদেশি স্কুল
 
-বাংলাদেশ কমিউনিটি স্কুল, কোরিয়া (BCSK) দক্ষিণ কোরিয়ায় প্রবাসী বাংলাদেশি কমিউনিটির সন্তানদের জন্য প্রতিষ্ঠিত প্রথম শিক্ষা প্রতিষ্ঠান। ৩০ বছরেরও বেশি সময় ধরে দক্ষিণ কোরিয়ায় বাংলাদেশিদের উপস্থিতি থাকা সত্ত্বেও আমাদের সন্তানদের দেশীয় শিক্ষা-সংস্কৃতির সাথে পরিচয় করিয়ে দেওয়ার মতো কোনো প্রতিষ্ঠান ছিল না — BCSK সেই শূন্যতা পূরণ করেছে।
+বাংলাদেশ কমিউনিটি স্কুল (BCSK) দক্ষিণ কোরিয়ায় প্রবাসী বাংলাদেশি কমিউনিটির সন্তানদের জন্য প্রতিষ্ঠিত প্রথম শিক্ষা প্রতিষ্ঠান। ৩০ বছরেরও বেশি সময় ধরে দক্ষিণ কোরিয়ায় বাংলাদেশিদের উপস্থিতি থাকা সত্ত্বেও আমাদের সন্তানদের দেশীয় শিক্ষা-সংস্কৃতির সাথে পরিচয় করিয়ে দেওয়ার মতো কোনো প্রতিষ্ঠান ছিল না — BCSK সেই শূন্যতা পূরণ করেছে।
 
 জাতীয় শিক্ষাক্রম ও পাঠ্যপুস্তক বোর্ড (NCTB)-এর হালনাগাদ শিক্ষাক্রম অনুসরণ করে প্রাক-প্রাথমিক থেকে পঞ্চম শ্রেণি পর্যন্ত পাঠদান, সেই সাথে কুরআন ও ইসলামিক স্টাডিজ, IELTS for Kids, অ্যাবাকাস এবং বিতর্কের বিশেষ কোর্স।
 
@@ -70,7 +70,7 @@ We hope that today's little children will grow to build the golden Bangladesh of
     title: "학교 소개",
     content: `## 한국 최초의 방글라데시 학교
 
-방글라데시 커뮤니티 스쿨 코리아(BCSK)는 대한민국에 거주하는 방글라데시 교민 자녀들을 위해 설립된 최초의 교육 기관입니다. 방글라데시인들이 한국에 30년 넘게 거주해 왔음에도 자녀들에게 모국의 교육 문화를 소개할 교육 기관이 없었습니다 — BCSK가 그 시작입니다.
+방글라데시 커뮤니티 스쿨(BCSK)는 대한민국에 거주하는 방글라데시 교민 자녀들을 위해 설립된 최초의 교육 기관입니다. 방글라데시인들이 한국에 30년 넘게 거주해 왔음에도 자녀들에게 모국의 교육 문화를 소개할 교육 기관이 없었습니다 — BCSK가 그 시작입니다.
 
 방글라데시 국가교육과정(NCTB)에 따라 유치부부터 5학년까지 교육하며, 꾸란·이슬람학, 어린이 IELTS, 주산(아바쿠스), 토론 등 특별 과정을 운영합니다.
 
@@ -89,7 +89,7 @@ We hope that today's little children will grow to build the golden Bangladesh of
     title: "Message from the Chairman",
     content: `**Dr. Kamrul Hasan** — *Chairman, Governing Body*
 
-I am grateful to the Almighty Allah (SWT), whose infinite mercy has started the journey of the Bangladesh Community School, Korea.
+I am grateful to the Almighty Allah (SWT), whose infinite mercy has started the journey of the Bangladesh Community School.
 
 Despite the presence of Bangladeshis in South Korea for over 30 years, no educational institution had been established to introduce our children to our local educational culture. The institution has started its journey with the aim of connecting the next generation with the mainstream education of the country — providing Bengali language instruction, cultural education, and religious training while maintaining academic excellence aligned with South Korea's educational standards.
 
@@ -328,7 +328,7 @@ Individual class-by-class timing is confirmed with your child's teacher after en
     title: "Privacy Policy",
     content: `## Privacy Policy
 
-Bangladesh Community School, Korea (BCSK) processes personal information in accordance with South Korea's **Personal Information Protection Act (PIPA)**.
+Bangladesh Community School (BCSK) processes personal information in accordance with South Korea's **Personal Information Protection Act (PIPA)**.
 
 ### What we collect
 Application data (child's name, date of birth, guardian details, contact information, photo), payment references, and learning records (attendance, grades, submissions).

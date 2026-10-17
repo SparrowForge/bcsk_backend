@@ -20,7 +20,7 @@ function docToBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
 
 function letterhead(doc: PDFKit.PDFDocument, title: string) {
   doc.rect(0, 0, doc.page.width, 90).fill(NAVY);
-  doc.fill("white").font("Helvetica-Bold").fontSize(18).text("Bangladesh Community School, Korea", 50, 24);
+  doc.fill("white").font("Helvetica-Bold").fontSize(18).text("Bangladesh Community School", 50, 24);
   doc.font("Helvetica").fontSize(9).fillColor("#d9eef8")
     .text("The first Bangladeshi community school in South Korea", 50, 48)
     .text("bcskr22@gmail.com  ·  +82 10-6893-6237  ·  Yongin-si, Gyeonggi-do", 50, 62);
@@ -105,7 +105,7 @@ export async function certificatePdf(data: {
   doc.font("Helvetica-Bold").fontSize(22).fillColor(NAVY).text(data.studentName, { align: "center", width: doc.page.width - 100 });
   doc.moveDown(0.4);
   doc.font("Helvetica").fontSize(12).fillColor(INK).text(
-    `Student ID ${data.studentId} is a bona fide student of Bangladesh Community School, Korea,\nenrolled in ${data.classLevel} for the ${data.semester} semester.`,
+    `Student ID ${data.studentId} is a bona fide student of Bangladesh Community School,\nenrolled in ${data.classLevel} for the ${data.semester} semester.`,
     { align: "center", width: doc.page.width - 100 }
   );
   doc.moveDown(2);
@@ -135,7 +135,7 @@ export async function idCardPdf(data: {
   doc.rect(0, 0, W, H).fill("white");
   doc.rect(0, 0, W, 74).fill(NAVY);
   doc.circle(W - 40, 100, 70).fillOpacity(0.08).fill(SKY).fillOpacity(1);
-  doc.fill("white").font("Helvetica-Bold").fontSize(15).text("Bangladesh Community School, Korea", 20, 18);
+  doc.fill("white").font("Helvetica-Bold").fontSize(15).text("Bangladesh Community School", 20, 18);
   doc.font("Helvetica").fontSize(8).fillColor("#d9eef8").text("STUDENT IDENTITY CARD", 20, 40);
 
   doc.font("Helvetica-Bold").fontSize(20).fillColor(NAVY).text(data.studentName, 20, 100, { width: 300 });
