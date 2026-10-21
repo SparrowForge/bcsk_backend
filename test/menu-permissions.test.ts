@@ -23,7 +23,7 @@ const ofPanel = (p: string) => DEFAULT_MENUS.filter((m) => m.panel === p);
 
 describe("menu catalog", () => {
   it("covers every admin sidebar menu, and the teacher and student panels", () => {
-    expect(ofPanel("ADMIN")).toHaveLength(18);
+    expect(ofPanel("ADMIN")).toHaveLength(19);
     expect(ofPanel("TEACHER").map((m) => m.label)).toEqual(["My Classes", "Questions", "Task List", "Guardians"]);
     expect(ofPanel("STUDENT").length).toBe(10);
   });
@@ -123,6 +123,13 @@ describe("effective access", () => {
   });
   it("lets a custom grid widen a narrow role", () => {
     expect(effectiveAccess("IT_SUPPORT", [row("payments", { a: true, u: true })], DEFAULT_MENUS).permissions).toContain("payments:verify");
+  });
+  it("shows a menu added after the grid was saved when the grid already grants its capability", () => {
+    // Saved before "General Classes" existed: no curriculum row, but Courses access grants courses:manage.
+    const a = effectiveAccess("ADMIN_SUPPORT", [row("courses", { a: true })], DEFAULT_MENUS);
+    expect(a.menus["curriculum"]!.access).toBe(true);
+    // A capability the grid does not grant keeps its menu hidden.
+    expect(effectiveAccess("ADMIN_SUPPORT", [row("tickets", { a: true })], DEFAULT_MENUS).menus["curriculum"]!.access).toBe(false);
   });
   it("restricts a student or teacher to the menus ticked", () => {
     const s = effectiveAccess("STUDENT", [row("classroom.videos", { a: true })], DEFAULT_MENUS);

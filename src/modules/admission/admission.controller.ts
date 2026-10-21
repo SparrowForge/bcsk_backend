@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, Req } from "@nestjs/common";
 import type { Request } from "express";
 import { z } from "zod";
 import { AdmissionService } from "./admission.service";
-import { applicationSchema, couponCheckSchema, feePreviewSchema } from "./admission.schema";
+import { applicationSchema, assessmentSchema, couponCheckSchema, feePreviewSchema } from "./admission.schema";
 import { CurrentActor, Public, RequirePermission } from "../../common/decorators/actor.decorator";
 import type { Actor } from "../../common/actor";
 import { clientIp } from "../../common/client-ip";
@@ -86,6 +86,13 @@ export class AdmissionController {
   corrections(@Param("id") raw: string, @Body() body: unknown, @CurrentActor() actor: Actor) {
     const { note } = z.object({ note: z.string().trim().min(1) }).parse(body);
     return this.admissions.requestCorrections(idParam.parse(raw), note, actor);
+  }
+
+  /** The assessor's comment and payment notes from the school's admission form. */
+  @RequirePermission("admissions:decide")
+  @Post(":id/assessment")
+  assessment(@Param("id") raw: string, @Body() body: unknown, @CurrentActor() actor: Actor) {
+    return this.admissions.saveAssessment(idParam.parse(raw), assessmentSchema.parse(body), actor);
   }
 
   @RequirePermission("admissions:decide")

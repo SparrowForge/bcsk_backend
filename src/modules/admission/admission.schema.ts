@@ -9,6 +9,9 @@ import { z } from "zod";
  */
 const common = {
   applicantName: z.string().trim().min(2).max(120),
+  /** The parts of applicantName, as the paper form asks them. Older callers send only the whole. */
+  firstName: z.string().trim().max(60).optional(),
+  lastName: z.string().trim().max(60).optional(),
   dob: z.string().min(4),
   gender: z.string().min(1),
   religion: z.string().min(1),
@@ -17,6 +20,8 @@ const common = {
   addressBangladesh: z.string().min(2).max(400),
   addressKorea: z.string().max(400).optional(),
   emergencyContact: z.string().min(5).max(120),
+  emergencyContactName: z.string().trim().max(120).optional(),
+  emergencyContactPhone: z.string().trim().max(60).optional(),
   parentalConsent: z.literal(true, { message: "Parental consent is required (PIPA)." }),
   photoPath: z.string().optional(),
   recaptchaToken: z.string().optional(),
@@ -35,6 +40,20 @@ const guardian = {
   guardianPhone2: z.string().max(40).optional(),
 };
 
+/** Each parent's details, asked separately (the school's paper form, sections 2 and 3). */
+const parentDetails = {
+  fatherEmail: z.string().trim().email().max(200).optional(),
+  fatherEducation: z.string().trim().max(120).optional(),
+  fatherProfession: z.string().trim().max(120).optional(),
+  fatherPhone: z.string().trim().max(60).optional(),
+  motherEmail: z.string().trim().email().max(200).optional(),
+  motherEducation: z.string().trim().max(120).optional(),
+  motherProfession: z.string().trim().max(120).optional(),
+  motherPhone: z.string().trim().max(60).optional(),
+  /** The class the student is in now, at any school. */
+  presentQualification: z.string().trim().max(200).optional(),
+};
+
 /**
  * A class is chosen by `courseLevelId` - a level of the Regular Course. `grade` (PRE_PRIMARY,
  * CLASS_1…) is still accepted for older callers; the service needs one of the two.
@@ -47,6 +66,7 @@ const classChoice = {
 const regular = z.object({
   ...common,
   ...guardian,
+  ...parentDetails,
   ...classChoice,
   type: z.literal("REGULAR"),
   photoPath: z.string().min(1, "A photo is required."),
@@ -70,9 +90,18 @@ const reAdmission = z.object({
   /** The returning student's existing BCSK ID; checked against the student records. */
   studentId: z.string().trim().min(3).max(40),
   ...classChoice,
+  ...parentDetails,
   fatherName: guardian.fatherName.optional(),
   motherName: guardian.motherName.optional(),
 });
+
+/** Staff notes from the admission assessment. Either may be cleared by sending an empty string. */
+export const assessmentSchema = z.object({
+  assessorComment: z.string().trim().max(1000).optional(),
+  paymentNote: z.string().trim().max(1000).optional(),
+});
+
+export type AssessmentInput = z.infer<typeof assessmentSchema>;
 
 export const applicationSchema = z.discriminatedUnion("type", [regular, special, reAdmission]);
 

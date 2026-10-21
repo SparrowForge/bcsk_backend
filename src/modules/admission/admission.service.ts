@@ -14,7 +14,7 @@ import { discountFor, describeDiscount, normalizeCode } from "../coupon/coupon.r
 import type { Actor } from "../../common/actor";
 import { Prisma } from "@prisma/client";
 import { SEMESTER_CURRENT } from "../../common/constants";
-import type { ApplicationInput, CouponCheck } from "./admission.schema";
+import type { ApplicationInput, AssessmentInput, CouponCheck } from "./admission.schema";
 
 type FeePreviewQuery = { type: string; grade?: string; courseName?: string; courseLevelId?: number };
 
@@ -74,6 +74,8 @@ export class AdmissionService {
     const data: Prisma.ApplicationFormCreateInput = {
       type: input.type,
       applicantName: input.applicantName,
+      firstName: input.firstName || null,
+      lastName: input.lastName || null,
       dob,
       gender: input.gender,
       religion: input.religion,
@@ -83,6 +85,8 @@ export class AdmissionService {
       addressKorea: input.addressKorea || null,
       addressBangladesh: input.addressBangladesh,
       emergencyContact: input.emergencyContact,
+      emergencyContactName: input.emergencyContactName || null,
+      emergencyContactPhone: input.emergencyContactPhone || null,
       learningMode: input.learningMode ?? null,
       semester: SEMESTER_CURRENT,
       parentalConsent: true,
@@ -116,6 +120,15 @@ export class AdmissionService {
       data.grade = level.code;
       data.fatherName = input.fatherName || null;
       data.motherName = input.motherName || null;
+      data.fatherEmail = input.fatherEmail || null;
+      data.fatherEducation = input.fatherEducation || null;
+      data.fatherProfession = input.fatherProfession || null;
+      data.fatherPhone = input.fatherPhone || null;
+      data.motherEmail = input.motherEmail || null;
+      data.motherEducation = input.motherEducation || null;
+      data.motherProfession = input.motherProfession || null;
+      data.motherPhone = input.motherPhone || null;
+      data.presentQualification = input.presentQualification || null;
       if (input.type === "REGULAR") {
         data.guardianProfession = input.guardianProfession || null;
         data.guardianEducation = input.guardianEducation || null;
@@ -286,6 +299,22 @@ export class AdmissionService {
     }
     await this.audit.record(actor.userId, "ADMISSION_DECISION", "ApplicationForm", id, `corrections: ${note}`);
     return { applicationId: id, status: "CORRECTIONS_REQUESTED" };
+  }
+
+  /** The assessor's comment and payment notes. An empty string clears a field; an absent one leaves it. */
+  async saveAssessment(id: number, input: AssessmentInput, actor: Actor) {
+    const existing = await this.prisma.applicationForm.findUnique({ where: { id }, select: { id: true } });
+    if (!existing) throw notFound("Application");
+    const data: Prisma.ApplicationFormUpdateInput = {};
+    if (input.assessorComment !== undefined) data.assessorComment = input.assessorComment || null;
+    if (input.paymentNote !== undefined) data.paymentNote = input.paymentNote || null;
+    const app = await this.prisma.applicationForm.update({
+      where: { id },
+      data,
+      select: { id: true, assessorComment: true, paymentNote: true },
+    });
+    await this.audit.record(actor.userId, "ADMISSION_ASSESSMENT", "ApplicationForm", id, "assessment notes updated");
+    return app;
   }
 
   async reject(id: number, reason: string, actor: Actor) {

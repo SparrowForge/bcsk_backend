@@ -103,6 +103,7 @@ export const ADMIN_NAV: { href: string; label: string; permission: Permission | 
   { href: "/admin/student-corner", label: "Student Corner", permission: "corner:manage" },
   { href: "/admin/governing", label: "Governing Body", permission: "governing:manage" },
   { href: "/admin/courses", label: "Courses & Levels", permission: "courses:manage" },
+  { href: "/admin/curriculum", label: "General Classes", permission: "courses:manage" },
   { href: "/admin/scheduling", label: "Scheduling", permission: "scheduling:manage" },
   { href: "/admin/users", label: "Users", permission: "users:manage" },
   { href: "/admin/user-permissions", label: "Menu Permissions", permission: "permissions:manage" },

@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed-academic": "tsx prisma/seed-academic.ts",
     "db:rotate-passwords": "tsx prisma/rotate-passwords.ts",
     "db:backfill-payer": "tsx prisma/backfill-payer-user-id.ts",
     "postinstall": "prisma generate && node scripts/bundle-vendor.mjs"

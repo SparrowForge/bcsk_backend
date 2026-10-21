@@ -1,0 +1,16 @@
+-- AlterTable
+ALTER TABLE "ApplicationForm" ADD COLUMN     "firstName" TEXT,
+ADD COLUMN     "lastName" TEXT,
+ADD COLUMN     "emergencyContactName" TEXT,
+ADD COLUMN     "emergencyContactPhone" TEXT,
+ADD COLUMN     "fatherEmail" TEXT,
+ADD COLUMN     "fatherEducation" TEXT,
+ADD COLUMN     "fatherProfession" TEXT,
+ADD COLUMN     "fatherPhone" TEXT,
+ADD COLUMN     "motherEmail" TEXT,
+ADD COLUMN     "motherEducation" TEXT,
+ADD COLUMN     "motherProfession" TEXT,
+ADD COLUMN     "motherPhone" TEXT,
+ADD COLUMN     "presentQualification" TEXT,
+ADD COLUMN     "assessorComment" TEXT,
+ADD COLUMN     "paymentNote" TEXT;

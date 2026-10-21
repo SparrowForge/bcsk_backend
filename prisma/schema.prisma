@@ -286,7 +286,9 @@ model ApplicationForm {
   type             String // REGULAR | SPECIAL | RE_ADMISSION - every registration lands in this one table
   status           String   @default("PENDING_PAYMENT") // PENDING_PAYMENT | PENDING_VERIFICATION | PAID | APPROVED | REJECTED | CORRECTIONS_REQUESTED
   // shared applicant fields
-  applicantName    String
+  applicantName    String // "First Last"; kept whole because re-admission and activation key on it
+  firstName        String?
+  lastName         String?
   dob              DateTime?
   gender           String?
   religion         String?
@@ -295,7 +297,9 @@ model ApplicationForm {
   photoUrl         String?
   addressKorea     String?
   addressBangladesh String?
-  emergencyContact String?
+  emergencyContact String? // "Name, phone" - the two columns below hold the parts
+  emergencyContactName  String?
+  emergencyContactPhone String?
   learningMode     String? // online | hybrid
   // re-admission: the returning student's existing ID, verified against StudentProfile at submit
   studentId        String?
@@ -303,10 +307,20 @@ model ApplicationForm {
   // regular course
   grade           String? // PRE_PRIMARY..CLASS_5
   fatherName       String?
+  fatherEmail      String?
+  fatherEducation  String?
+  fatherProfession String?
+  fatherPhone      String?
   motherName       String?
+  motherEmail      String?
+  motherEducation  String?
+  motherProfession String?
+  motherPhone      String?
+  // Single-guardian columns from before father and mother were asked separately.
   guardianProfession String?
   guardianEducation String?
   guardianPhone2   String?
+  presentQualification String? // the class the student is in now (e.g. "Class 1, Korean school")
   // special course
   courseName       String? // slug of special course
   // The level or track the family chose (Abacus Level 2, Deen girls' Tajweed…). Activation
@@ -321,6 +335,9 @@ model ApplicationForm {
   parentalConsent  Boolean  @default(false) // PIPA consent
   adminNote        String?
   correctionNote   String?
+  // Staff-written, from the admission assessment
+  assessorComment  String?
+  paymentNote      String?
   createdStudentUserId Int?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -563,6 +580,50 @@ model CurriculumEntry {
   displayOrder Int    @default(100)
 
   @@index([classLevel, displayOrder])
+}
+
+/**
+ * A general class as the public site shows it (Academic > All General Classes): a card on the
+ * class list and a page of its own listing the books taught. Content only - enrolment still
+ * keys on CourseLevel and the classLevel strings.
+ */
+model AcademicClass {
+  id             Int      @id @default(autoincrement())
+  slug           String   @unique // pre-primary, class-1 ... - the page URL
+  name           String // "Pre-Primary", "Class 1"
+  ageRange       String? // "Age 3-5"
+  summary        String? // the card's short text
+  tagline        String? // the line under the title on the class page banner
+  intro          String? // "What we offer" paragraph
+  highlights     String[] @default([]) // the short items beside the intro
+  color          String   @default("green") // green | blue | purple | orange | teal | red | indigo
+  cardImageUrl   String?
+  bannerImageUrl String?
+  displayOrder   Int      @default(100)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  subjects       ClassSubject[]
+
+  @@index([active, displayOrder])
+}
+
+/** One book or subject taught in an AcademicClass, added from the admin panel. */
+model ClassSubject {
+  id            Int           @id @default(autoincrement())
+  classId       Int
+  academicClass AcademicClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  title         String
+  category      String        @default("MAIN") // MAIN | RELATED | HOMEWORK
+  description   String?
+  outcomes      String[]      @default([])
+  coverImageUrl String?
+  color         String        @default("pink") // pink | purple | blue | teal | green | yellow | orange | red | indigo
+  displayOrder  Int           @default(100)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([classId, displayOrder])
 }
 
 model ProgressRecord {

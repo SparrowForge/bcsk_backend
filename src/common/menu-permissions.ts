@@ -66,6 +66,7 @@ export const MENU_GRANTS: Record<string, Partial<Record<MenuFlag, readonly Permi
   corner: { access: ["corner:manage"] },
   governing: { access: ["governing:manage"] },
   courses: { access: ["courses:manage"] },
+  curriculum: { access: ["courses:manage"] },
   scheduling: { access: ["scheduling:manage"] },
   reports: { access: ["reports:manage"] },
   users: { access: ["users:manage"] },
@@ -93,6 +94,7 @@ const SEEDS: Seed[] = [
   { key: "corner", panel: "ADMIN", module: "Website Content", label: "Student Corner", href: "/admin/student-corner" },
   { key: "governing", panel: "ADMIN", module: "Website Content", label: "Governing Body", href: "/admin/governing" },
   { key: "courses", panel: "ADMIN", module: "Academics", label: "Courses & Levels", href: "/admin/courses" },
+  { key: "curriculum", panel: "ADMIN", module: "Academics", label: "General Classes", href: "/admin/curriculum", note: "Class pages and their books on the public site" },
   { key: "scheduling", panel: "ADMIN", module: "Academics", label: "Scheduling", href: "/admin/scheduling" },
   { key: "reports", panel: "ADMIN", module: "Academics", label: "Reports", href: "/admin/reports", note: "Exam results and student documents" },
   { key: "users", panel: "ADMIN", module: "Administration", label: "Users", href: "/admin/users" },
@@ -211,12 +213,29 @@ export function effectiveAccess(role: Role, rows: Row[] | null | undefined, allM
     return { permissions: permissionsFor(role), menus: gridForRole(role, menus) };
   }
   const byKey = new Map(rows!.map((r) => [r.menuKey, r]));
+  const permissions = panel === "ADMIN" ? permissionsFromGrid(rows!) : [];
+  const held = new Set<string>(permissions);
   const grid: Record<string, MenuGrid> = {};
   for (const m of menus) {
     const r = byKey.get(m.key);
-    grid[m.key] = r ? normaliseGrid(m, toGrid(r)) : emptyGrid();
+    if (r) grid[m.key] = normaliseGrid(m, toGrid(r));
+    // An admin menu added after this grid was saved has no row. Its switches follow the
+    // capabilities the grid already grants, so the link shows exactly when its page would
+    // open - otherwise "General Classes" stayed hidden from an account whose Courses access
+    // already let it in.
+    else grid[m.key] = panel === "ADMIN" ? heldGrid(m, held) : emptyGrid();
   }
-  return { permissions: panel === "ADMIN" ? permissionsFromGrid(rows!) : [], menus: grid };
+  return { permissions, menus: grid };
+}
+
+/** The switches of an admin menu that a set of held capabilities covers. */
+function heldGrid(m: MenuRow, held: Set<string>): MenuGrid {
+  const g = emptyGrid();
+  for (const f of offeredFlags(m)) {
+    const needs = MENU_GRANTS[m.key]?.[f] ?? [];
+    g[f] = needs.length > 0 && needs.every((p) => held.has(p));
+  }
+  return g;
 }
 
 function fullGrid(m: MenuRow): MenuGrid {
