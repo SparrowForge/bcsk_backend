@@ -4,18 +4,20 @@ import { PrismaClient } from "@prisma/client";
 /**
  * The one place the database is reached from.
  *
- * Carries over the pooler fix from the previous monolith: Neon's pooled endpoints run
- * PgBouncer in transaction mode, which needs Prisma's `pgbouncer=true` flag or you get
- * "prepared statement already exists". The integration-managed URL omits it, so it is
- * appended whenever the host looks pooled.
+ * Deliberately does NOT append Prisma's `pgbouncer=true`. Neon's pooler tracks prepared
+ * statements itself (PgBouncer `max_prepared_statements`), so the old "prepared statement
+ * already exists" failure no longer happens, while the flag turned off statement caching and
+ * cost ~5 round trips per query instead of 1 (measured 21 Oct 2026: ~260ms vs ~50ms at a
+ * 52ms RTT; 400 concurrent pooled queries without it, zero errors). Pooled hosts still get a
+ * longer connect timeout, since a suspended Neon compute takes a moment to wake.
  */
 function resolveDatabaseUrl(): string | undefined {
   const url = process.env.DATABASE_URL;
   if (!url) return url;
-  if (url.includes("pgbouncer=")) return url;
+  if (url.includes("connect_timeout=")) return url;
   const isPooled = /-pooler\./.test(url) || /pgbouncer/i.test(url);
   if (!isPooled) return url;
-  return url + (url.includes("?") ? "&" : "?") + "pgbouncer=true&connect_timeout=15";
+  return url + (url.includes("?") ? "&" : "?") + "connect_timeout=15";
 }
 
 @Injectable()
