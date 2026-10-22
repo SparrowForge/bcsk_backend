@@ -25,49 +25,249 @@ model FileBlob {
   createdAt DateTime @default(now())
 }
 
-model User {
+/**
+ * A school using the platform. Every account and every top-level academic record belongs to
+ * one, and a staff member only ever sees their own institute's rows (`common/institute-scope.ts`).
+ * One row today - BCSK, id 1, inserted by the migration - so the `@default(1)` on the owning
+ * columns files rows made by public flows (admission activation) and the seeds under it.
+ */
+model Institute {
+  id             Int            @id @default(autoincrement())
+  code           String         @unique // short stable key: BCSK
+  name           String
+  nameBn         String?
+  nameKo         String?
+  address        String?
+  phone          String?
+  email          String?
+  website        String?
+  logoUrl        String?
+  headMasterName String? // printed under the signature on reports and certificates
+  signatureUrl   String?
+  active         Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  users          User[]
+  courses        Course[]
+  departments    Department[]
+  terms          AcademicTerm[]
+  subjects       Subject[]
+}
+
+/**
+ * ------------------------------------------------------------ academic structure (LMS B1)
+ * Institute → Department → Course → class (CourseLevel) → Batch (class × term) → Section.
+ * Regular schooling is one "Regular Course" whose levels are Pre-Primary..Class 5; a special
+ * course (Abacus, IELTS) uses its own levels. Child tables are scoped to an institute through
+ * their parent (a Batch through its term), never by a column of their own.
+ */
+
+model Department {
   id           Int       @id @default(autoincrement())
-  loginId      String    @unique // Student ID / Teacher ID / Admin ID
-  email        String?
-  passwordHash String
-  role         String // STUDENT | TEACHER | ADMIN_SUPPORT | IT_SUPPORT | SUPER_ADMIN
+  instituteId  Int
+  institute    Institute @relation(fields: [instituteId], references: [id])
   name         String
-  langPref     String    @default("en") // en | bn | ko
+  code         String // short key, unique within the institute: GEN, DEEN
+  headUserId   Int? // the teacher or staff member who leads it
+  head         User?     @relation("DepartmentHead", fields: [headUserId], references: [id], onDelete: SetNull)
+  displayOrder Int       @default(100)
   active       Boolean   @default(true)
-  // SEC-2: set on seeded/rotated/office-issued credentials. Every surface guard
-  // diverts to /change-password until the holder sets their own password.
-  mustChangePassword Boolean  @default(false)
-  passwordChangedAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  courses      Course[]
+  subjects     Subject[]
 
-  studentProfile StudentProfile?
-  teacherProfile TeacherProfile?
-  enrollments    Enrollment[]
-  attendances    Attendance[]
-  submissions    Submission[]
-  payments       Payment[]        @relation("PayerPayments")
-  verifiedPayments Payment[]      @relation("VerifierPayments")
-  notifications  Notification[]
-  questionsAsked Question[]       @relation("StudentQuestions")
-  questionsRecv  Question[]       @relation("TeacherQuestions")
-  teacherTasks   TeacherTask[]
-  certificates   Certificate[]
-  progressRecords ProgressRecord[]
-  gameScores     GameScore[]
-  hifzProgress   HifzProgress[]
-  examResults    ExamResult[]
-  auditLogs      AuditLog[]
-  passwordResets PasswordReset[]
-  refreshTokens  RefreshToken[]
-  assignedLeads Lead[]         @relation("LeadOwner")
-  leadActivities LeadActivity[]
-  menuPermissions UserMenuPermission[]
+  @@unique([instituteId, code])
+}
+
+/**
+ * A semester. `code` keeps the strings the older tables still key on (`ClassSession.semester`,
+ * `Enrollment.semester`: "2026-2"), so they and this table name the same term.
+ */
+model AcademicTerm {
+  id          Int       @id @default(autoincrement())
+  instituteId Int
+  institute   Institute @relation(fields: [instituteId], references: [id])
+  code        String
+  name        String
+  startDate   DateTime?
+  endDate     DateTime?
+  isCurrent   Boolean   @default(false) // at most one per institute; the service keeps it so
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  batches     Batch[]
+
+  @@unique([instituteId, code])
+  @@index([instituteId, isCurrent])
+}
+
+/**
+ * One class in one term: "Class 3, 2026-2". Its sections divide the students.
+ */
+model Batch {
+  id            Int                 @id @default(autoincrement())
+  courseLevelId Int
+  courseLevel   CourseLevel         @relation(fields: [courseLevelId], references: [id], onDelete: Cascade)
+  termId        Int
+  term          AcademicTerm        @relation(fields: [termId], references: [id], onDelete: Cascade)
+  name          String
+  createdAt     DateTime            @default(now())
+  sections      Section[]
+  enrollments   SectionEnrollment[]
+
+  @@unique([courseLevelId, termId])
+  @@index([termId])
+}
+
+model Section {
+  id             Int                 @id @default(autoincrement())
+  batchId        Int
+  batch          Batch               @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  name           String // A, B
+  capacity       Int?
+  room           String? // a room, or "Online"
+  classTeacherId Int? // TeacherProfile.id
+  classTeacher   TeacherProfile?     @relation("ClassTeacher", fields: [classTeacherId], references: [id], onDelete: SetNull)
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  enrollments    SectionEnrollment[]
+  assignments    TeacherAssignment[]
+  sessions       ClassSession[]
+
+  @@unique([batchId, name])
+  @@index([classTeacherId])
+}
+
+/**
+ * What is taught and examined: Bangla, Mathematics, Abacus. Marks rules live per class in `CurriculumSubject`.
+ */
+model Subject {
+  id           Int                 @id @default(autoincrement())
+  instituteId  Int
+  institute    Institute           @relation(fields: [instituteId], references: [id])
+  departmentId Int?
+  department   Department?         @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  code         String // unique within the institute: BAN, MATH, ABACUS
+  name         String
+  type         String              @default("THEORY") // THEORY | PRACTICAL
+  displayOrder Int                 @default(100)
+  active       Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  curriculum   CurriculumSubject[]
+  assignments  TeacherAssignment[]
+  sessions     ClassSession[]
+
+  @@unique([instituteId, code])
+}
+
+/**
+ * A subject as taught in one class, with the marks rules its exams use.
+ */
+model CurriculumSubject {
+  id            Int         @id @default(autoincrement())
+  courseLevelId Int
+  courseLevel   CourseLevel @relation(fields: [courseLevelId], references: [id], onDelete: Cascade)
+  subjectId     Int
+  subject       Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  fullMarks     Int         @default(100)
+  passMarks     Int         @default(33)
+  isOptional    Boolean     @default(false)
+  displayOrder  Int         @default(100)
+
+  @@unique([courseLevelId, subjectId])
+  @@index([subjectId])
+}
+
+/**
+ * A student's place in a section. One per batch - a student is in one section of Class 3 for
+ * a term, and may separately be in a section of Abacus Level 2. `batchId` repeats the section's
+ * batch so the database can hold that rule.
+ */
+model SectionEnrollment {
+  id            Int      @id @default(autoincrement())
+  studentUserId Int
+  student       User     @relation("SectionStudent", fields: [studentUserId], references: [id], onDelete: Cascade)
+  sectionId     Int
+  section       Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  batchId       Int
+  batch         Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rollNo        Int?
+  status        String   @default("ACTIVE") // ACTIVE | COMPLETED | TRANSFERRED | LEFT
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([studentUserId, batchId])
+  @@unique([sectionId, rollNo])
+  @@index([sectionId, status])
+}
+
+/**
+ * Who teaches which subject to which section. The class teacher is `Section.classTeacherId`.
+ */
+model TeacherAssignment {
+  id               Int            @id @default(autoincrement())
+  teacherProfileId Int
+  teacher          TeacherProfile @relation(fields: [teacherProfileId], references: [id], onDelete: Cascade)
+  sectionId        Int
+  section          Section        @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subjectId        Int
+  subject          Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+
+  @@unique([teacherProfileId, sectionId, subjectId])
+  @@index([sectionId, subjectId])
+}
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  instituteId        Int       @default(1)
+  institute          Institute @relation(fields: [instituteId], references: [id])
+  loginId            String    @unique // Student ID / Teacher ID / Admin ID
+  email              String?
+  passwordHash       String
+  role               String // STUDENT | TEACHER | HEAD_MASTER | ADMIN_SUPPORT | IT_SUPPORT | SUPER_ADMIN
+  name               String
+  langPref           String    @default("en") // en | bn | ko
+  active             Boolean   @default(true)
+  // SEC-2: set on seeded/rotated/office-issued credentials. Every surface guard
+  // diverts to /change-password until the holder sets their own password.
+  mustChangePassword Boolean   @default(false)
+  passwordChangedAt  DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  studentProfile   StudentProfile?
+  teacherProfile   TeacherProfile?
+  enrollments      Enrollment[]
+  attendances      Attendance[]
+  submissions      Submission[]
+  payments         Payment[]            @relation("PayerPayments")
+  verifiedPayments Payment[]            @relation("VerifierPayments")
+  notifications    Notification[]
+  questionsAsked   Question[]           @relation("StudentQuestions")
+  questionsRecv    Question[]           @relation("TeacherQuestions")
+  teacherTasks     TeacherTask[]
+  certificates     Certificate[]
+  progressRecords  ProgressRecord[]
+  gameScores       GameScore[]
+  hifzProgress     HifzProgress[]
+  examResults      ExamResult[]
+  auditLogs        AuditLog[]
+  passwordResets   PasswordReset[]
+  refreshTokens    RefreshToken[]
+  assignedLeads    Lead[]               @relation("LeadOwner")
+  leadActivities   LeadActivity[]
+  menuPermissions  UserMenuPermission[]
+  departmentsLed   Department[]         @relation("DepartmentHead")
+  sectionPlaces    SectionEnrollment[]  @relation("SectionStudent")
+
+  @@index([instituteId, role])
 }
 
 /**
  * Phase F: refresh tokens for mobile clients.
- *
  * Stored **hashed** — a database leak must not yield usable credentials. Rotated on every
  * use; presenting an already-rotated token revokes the whole family, which is the standard
  * signal that a token was stolen.
@@ -76,7 +276,9 @@ model RefreshToken {
   id         Int       @id @default(autoincrement())
   userId     Int
   tokenHash  String    @unique
-  /** Groups rotations of one login, so a reuse can revoke every descendant. */
+  /**
+   * Groups rotations of one login, so a reuse can revoke every descendant.
+   */
   familyId   String
   deviceName String?
   expiresAt  DateTime
@@ -91,141 +293,158 @@ model RefreshToken {
 }
 
 model PasswordReset {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   userId    Int
-  token     String   @unique
+  token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model StudentProfile {
-  id                Int      @id @default(autoincrement())
-  userId            Int      @unique
-  studentId         String   @unique // e.g. BCSK-2026-0001
-  classLevel        String // PRE_PRIMARY | CLASS_1..CLASS_5 | SPECIAL
-  photoUrl          String?
-  dob               DateTime?
-  gender            String?
-  religion          String?
-  fatherName        String?
-  motherName        String?
+  id                 Int       @id @default(autoincrement())
+  userId             Int       @unique
+  studentId          String    @unique // e.g. BCSK-2026-0001
+  classLevel         String // PRE_PRIMARY | CLASS_1..CLASS_5 | SPECIAL
+  photoUrl           String?
+  dob                DateTime?
+  gender             String?
+  religion           String?
+  fatherName         String?
+  motherName         String?
   guardianProfession String?
-  guardianEducation String?
-  guardianPhone     String?
-  guardianEmail     String?
-  addressKorea      String?
-  addressBangladesh String?
-  emergencyContact  String?
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guardianEducation  String?
+  guardianPhone      String?
+  guardianEmail      String?
+  addressKorea       String?
+  addressBangladesh  String?
+  emergencyContact   String?
+  admissionDate      DateTime? // set when the admission is activated
+  status             String    @default("ACTIVE") // ACTIVE | TRANSFERRED | LEFT | GRADUATED
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model TeacherProfile {
-  id          Int     @id @default(autoincrement())
-  userId      Int     @unique
-  teacherId   String  @unique // e.g. BCSK-T-001
-  designation String?
-  bio         String?
-  photoUrl    String?
-  guideClass  String? // guide-teacher class
-  subjects    String? // comma-separated for display
-  isPublic    Boolean @default(true) // show on public Teachers page and the homepage office board
+  id            Int                 @id @default(autoincrement())
+  userId        Int                 @unique
+  teacherId     String              @unique // e.g. BCSK-T-001
+  designation   String?
+  bio           String?
+  photoUrl      String?
+  guideClass    String? // guide-teacher class
+  subjects      String? // comma-separated for display
+  isPublic      Boolean             @default(true) // show on public Teachers page and the homepage office board
   // Homepage office board (LP-2). `deskStatus` is what a teacher toggles about themselves;
   // "in class" is never stored here - it is derived from owning a live ClassSession, so the
   // office board can never contradict the classroom board.
-  deskName    String? // board label where one teacher holds a named desk: "English-1", "Quran-Female"
-  deskStatus  String  @default("OFFLINE") // DESK | OFFLINE
-  returnAt    DateTime? // when they expect to be back at the desk; null renders as "-"
-  displayOrder Int    @default(100)
-  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deskName      String? // board label where one teacher holds a named desk: "English-1", "Quran-Female"
+  deskStatus    String              @default("OFFLINE") // DESK | OFFLINE
+  returnAt      DateTime? // when they expect to be back at the desk; null renders as "-"
+  displayOrder  Int                 @default(100)
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   classSessions ClassSession[]
+  sectionsLed   Section[]           @relation("ClassTeacher")
+  assignments   TeacherAssignment[]
 }
 
 model Course {
-  id          Int     @id @default(autoincrement())
-  slug        String  @unique // bangla, english, math, abacus, ielts-for-kids, deen, debate-club, hifz, bangla-language
-  name        String
-  type        String // REGULAR | SPECIAL
-  category    String? // subject | deen | ielts | abacus | debate
-  description String?
-  heroText    String?
-  active      Boolean @default(true)
-  displayOrder Int    @default(100)
-  levels      CourseLevel[]
-  sessions    ClassSession[]
-  fees        FeeConfig[]
-  leads       Lead[]
+  id           Int            @id @default(autoincrement())
+  instituteId  Int            @default(1)
+  institute    Institute      @relation(fields: [instituteId], references: [id])
+  departmentId Int?
+  department   Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  slug         String         @unique // bangla, english, math, abacus, ielts-for-kids, deen, debate-club, hifz, bangla-language
+  name         String
+  type         String // REGULAR | SPECIAL
+  category     String? // subject | deen | ielts | abacus | debate
+  description  String?
+  heroText     String?
+  active       Boolean        @default(true)
+  displayOrder Int            @default(100)
+  levels       CourseLevel[]
+  sessions     ClassSession[]
+  fees         FeeConfig[]
+  leads        Lead[]
+
+  @@index([instituteId])
 }
 
 model CourseLevel {
-  id           Int     @id @default(autoincrement())
-  courseId     Int
-  name         String // "Level 0" .. "Level 7", "Pre-Primary", track names
-  code         String? // stable key for the levels other tables still name as text: PRE_PRIMARY, CLASS_1..CLASS_5
-  displayOrder Int     @default(0)
-  syllabus     String? // markdown/plain topic coverage
+  id             Int                 @id @default(autoincrement())
+  courseId       Int
+  name           String // "Level 0" .. "Level 7", "Pre-Primary", track names
+  code           String? // stable key for the levels other tables still name as text: PRE_PRIMARY, CLASS_1..CLASS_5
+  displayOrder   Int                 @default(0)
+  syllabus       String? // markdown/plain topic coverage
   studentBookUrl String?
-  workBookUrl  String?
-  course       Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  sessions     ClassSession[]
-  applications ApplicationForm[]
-  fees         FeeConfig[]
+  workBookUrl    String?
+  course         Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sessions       ClassSession[]
+  applications   ApplicationForm[]
+  fees           FeeConfig[]
+  batches        Batch[]
+  curriculum     CurriculumSubject[]
 
   @@unique([courseId, code])
   @@index([courseId, displayOrder])
 }
 
 model ClassSession {
-  id           Int     @id @default(autoincrement())
-  courseId     Int
+  id            Int             @id @default(autoincrement())
+  courseId      Int
   courseLevelId Int?
-  title        String // e.g. "Level-0 Class-1", "Class 3 – Bangla"
-  classLevel   String? // for regular classes: PRE_PRIMARY..CLASS_5
-  dayOfWeek    String // e.g. "Saturday"
-  startTime    String // "10:00"
-  endTime      String? // "11:00"
-  semester     String  @default("2026-2")
-  teacherId    Int?
-  zoomLink     String?
-  isLive       Boolean @default(false)
-  liveSince    DateTime? // set when isLive flips on, cleared when it flips off - the board duration
-  notice       String?
-  active       Boolean @default(true)
-  course       Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  level        CourseLevel? @relation(fields: [courseLevelId], references: [id])
-  teacher      TeacherProfile? @relation(fields: [teacherId], references: [id])
-  enrollments  Enrollment[]
-  attendances  Attendance[]
-  assignments  Assignment[]
-  videos       ClassVideo[]
+  title         String // e.g. "Level-0 Class-1", "Class 3 – Bangla"
+  classLevel    String? // for regular classes: PRE_PRIMARY..CLASS_5
+  dayOfWeek     String // e.g. "Saturday"
+  startTime     String // "10:00"
+  endTime       String? // "11:00"
+  semester      String          @default("2026-2")
+  // LMS B1: the section and subject this slot teaches. Null on slots the backfill could not place.
+  sectionId     Int?
+  section       Section?        @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subjectId     Int?
+  subject       Subject?        @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  teacherId     Int?
+  zoomLink      String?
+  isLive        Boolean         @default(false)
+  liveSince     DateTime? // set when isLive flips on, cleared when it flips off - the board duration
+  notice        String?
+  active        Boolean         @default(true)
+  course        Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  level         CourseLevel?    @relation(fields: [courseLevelId], references: [id])
+  teacher       TeacherProfile? @relation(fields: [teacherId], references: [id])
+  enrollments   Enrollment[]
+  attendances   Attendance[]
+  assignments   Assignment[]
+  videos        ClassVideo[]
 
   @@index([courseId])
   @@index([courseLevelId])
   @@index([teacherId])
   @@index([classLevel, semester, active])
   @@index([semester, active])
+  @@index([sectionId])
 }
 
 model Enrollment {
-  id             Int      @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   studentUserId  Int
   classSessionId Int
   semester       String
-  status         String   @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED
-  createdAt      DateTime @default(now())
+  status         String       @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED
+  createdAt      DateTime     @default(now())
   student        User         @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
   classSession   ClassSession @relation(fields: [classSessionId], references: [id], onDelete: Cascade)
 
   @@unique([studentUserId, classSessionId, semester])
-
   @@index([classSessionId])
   @@index([studentUserId, semester, status])
 }
 
 model Attendance {
-  id             Int      @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   classSessionId Int
   studentUserId  Int
   date           DateTime
@@ -234,18 +453,17 @@ model Attendance {
   student        User         @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
 
   @@unique([classSessionId, studentUserId, date])
-
   @@index([studentUserId, date])
 }
 
 model Assignment {
-  id             Int      @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   classSessionId Int
   title          String
   description    String?
   fileUrl        String?
   dueDate        DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
   classSession   ClassSession @relation(fields: [classSessionId], references: [id], onDelete: Cascade)
   submissions    Submission[]
 
@@ -253,12 +471,12 @@ model Assignment {
 }
 
 model Submission {
-  id            Int      @id @default(autoincrement())
+  id            Int        @id @default(autoincrement())
   assignmentId  Int
   studentUserId Int
   fileUrl       String?
   text          String?
-  submittedAt   DateTime @default(now())
+  submittedAt   DateTime   @default(now())
   grade         String?
   feedback      String?
   gradedAt      DateTime?
@@ -266,116 +484,115 @@ model Submission {
   student       User       @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
 
   @@unique([assignmentId, studentUserId])
-
   @@index([studentUserId])
 }
 
 model ClassVideo {
-  id             Int      @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   classSessionId Int
   title          String
   videoUrl       String // uploaded file or YouTube/Zoom recording link
-  recordedAt     DateTime @default(now())
+  recordedAt     DateTime     @default(now())
   classSession   ClassSession @relation(fields: [classSessionId], references: [id], onDelete: Cascade)
 
   @@index([classSessionId, recordedAt])
 }
 
 model ApplicationForm {
-  id               Int      @id @default(autoincrement())
-  type             String // REGULAR | SPECIAL | RE_ADMISSION - every registration lands in this one table
-  status           String   @default("PENDING_PAYMENT") // PENDING_PAYMENT | PENDING_VERIFICATION | PAID | APPROVED | REJECTED | CORRECTIONS_REQUESTED
+  id                    Int          @id @default(autoincrement())
+  type                  String // REGULAR | SPECIAL | RE_ADMISSION - every registration lands in this one table
+  status                String       @default("PENDING_PAYMENT") // PENDING_PAYMENT | PENDING_VERIFICATION | PAID | APPROVED | REJECTED | CORRECTIONS_REQUESTED
   // shared applicant fields
-  applicantName    String // "First Last"; kept whole because re-admission and activation key on it
-  firstName        String?
-  lastName         String?
-  dob              DateTime?
-  gender           String?
-  religion         String?
-  phone            String?
-  email            String?
-  photoUrl         String?
-  addressKorea     String?
-  addressBangladesh String?
-  emergencyContact String? // "Name, phone" - the two columns below hold the parts
+  applicantName         String // "First Last"; kept whole because re-admission and activation key on it
+  firstName             String?
+  lastName              String?
+  dob                   DateTime?
+  gender                String?
+  religion              String?
+  phone                 String?
+  email                 String?
+  photoUrl              String?
+  addressKorea          String?
+  addressBangladesh     String?
+  emergencyContact      String? // "Name, phone" - the two columns below hold the parts
   emergencyContactName  String?
   emergencyContactPhone String?
-  learningMode     String? // online | hybrid
+  learningMode          String? // online | hybrid
   // re-admission: the returning student's existing ID, verified against StudentProfile at submit
-  studentId        String?
-  semester         String? // the semester the registration is for
+  studentId             String?
+  semester              String? // the semester the registration is for
   // regular course
-  grade           String? // PRE_PRIMARY..CLASS_5
-  fatherName       String?
-  fatherEmail      String?
-  fatherEducation  String?
-  fatherProfession String?
-  fatherPhone      String?
-  motherName       String?
-  motherEmail      String?
-  motherEducation  String?
-  motherProfession String?
-  motherPhone      String?
+  grade                 String? // PRE_PRIMARY..CLASS_5
+  fatherName            String?
+  fatherEmail           String?
+  fatherEducation       String?
+  fatherProfession      String?
+  fatherPhone           String?
+  motherName            String?
+  motherEmail           String?
+  motherEducation       String?
+  motherProfession      String?
+  motherPhone           String?
   // Single-guardian columns from before father and mother were asked separately.
-  guardianProfession String?
-  guardianEducation String?
-  guardianPhone2   String?
-  presentQualification String? // the class the student is in now (e.g. "Class 1, Korean school")
+  guardianProfession    String?
+  guardianEducation     String?
+  guardianPhone2        String?
+  presentQualification  String? // the class the student is in now (e.g. "Class 1, Korean school")
   // special course
-  courseName       String? // slug of special course
+  courseName            String? // slug of special course
   // The level or track the family chose (Abacus Level 2, Deen girls' Tajweed…). Activation
   // enrols into this level's classes; without it every special-course student used to land
   // in the course's first class. Null on applications made before the choice existed.
-  courseLevelId    Int?
-  courseLevel      CourseLevel? @relation(fields: [courseLevelId], references: [id], onDelete: SetNull)
-  highestEducation String?
+  courseLevelId         Int?
+  courseLevel           CourseLevel? @relation(fields: [courseLevelId], references: [id], onDelete: SetNull)
+  highestEducation      String?
   // SEC-3: the BCSK-student discount claim, persisted at submit time. The fee is derived
   // from this column and never from a request parameter.
-  isBcskStudent    Boolean  @default(false)
-  parentalConsent  Boolean  @default(false) // PIPA consent
-  adminNote        String?
-  correctionNote   String?
+  isBcskStudent         Boolean      @default(false)
+  parentalConsent       Boolean      @default(false) // PIPA consent
+  adminNote             String?
+  correctionNote        String?
   // Staff-written, from the admission assessment
-  assessorComment  String?
-  paymentNote      String?
-  createdStudentUserId Int?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  payments         Payment[]
-  leads            Lead[]
+  assessorComment       String?
+  paymentNote           String?
+  createdStudentUserId  Int?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  payments              Payment[]
+  leads                 Lead[]
   // Discount coupon, snapshotted at submit time. The payable amount is derived from these
   // columns and never from a request (SEC-3): editing or deleting the Coupon later does not
   // change what a family already holds.
-  couponId         Int?
-  coupon           Coupon?  @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  couponCode       String?
-  couponType       String? // PERCENT | FIXED
-  couponValue      Int? // percent (1-99) or KRW amount
+  couponId              Int?
+  coupon                Coupon?      @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCode            String?
+  couponType            String? // PERCENT | FIXED
+  couponValue           Int? // percent (1-99) or KRW amount
 
   @@index([status, createdAt])
   @@index([type, createdAt])
 }
 
 model Payment {
-  id               Int      @id @default(autoincrement())
+  id               Int              @id @default(autoincrement())
   applicationId    Int?
   payerUserId      Int? // for logged-in semester fee / re-admission payments
   purpose          String // ADMISSION | SEMESTER_FEE | SPECIAL_COURSE | RE_ADMISSION
   method           String // CARD | BANK_TRANSFER
   amount           Int // KRW
-  currency         String   @default("KRW")
-  status           String   @default("PENDING") // PENDING | PENDING_VERIFICATION | PAID | VERIFIED | REJECTED | REFUNDED | FAILED
+  currency         String           @default("KRW")
+  status           String           @default("PENDING") // PENDING | PENDING_VERIFICATION | PAID | VERIFIED | REJECTED | REFUNDED | FAILED
   // SEC-7.1: unique so a replayed gateway callback cannot record the same capture twice.
-  gatewayTxnId     String?  @unique // Toss paymentKey
-  gatewayOrderId   String?  @unique
-  virtualRef       String?  @unique // auto-generated bank reference
+  gatewayTxnId     String?          @unique // Toss paymentKey
+  gatewayOrderId   String?          @unique
+  virtualRef       String?          @unique // auto-generated bank reference
   receiptUploadUrl String? // uploaded bank receipt
-  receiptPdfSerial String?  @unique // our issued receipt number
+  receiptPdfSerial String?          @unique // our issued receipt number
   rejectReason     String?
   verifiedById     Int?
   verifiedAt       DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
   application      ApplicationForm? @relation(fields: [applicationId], references: [id])
   payer            User?            @relation("PayerPayments", fields: [payerUserId], references: [id])
   verifiedBy       User?            @relation("VerifierPayments", fields: [verifiedById], references: [id])
@@ -387,23 +604,23 @@ model Payment {
 }
 
 model FeeConfig {
-  id           Int     @id @default(autoincrement())
-  key          String  @unique // pre_primary, class_1..class_5, abacus, deen, debate_club, abacus_l1 ...
-  label        String
-  kind         String // REGULAR_CLASS | SPECIAL_COURSE (course-wide default) | SPECIAL_LEVEL (one level of a course)
+  id            Int          @id @default(autoincrement())
+  key           String       @unique // pre_primary, class_1..class_5, abacus, deen, debate_club, abacus_l1 ...
+  label         String
+  kind          String // REGULAR_CLASS | SPECIAL_COURSE (course-wide default) | SPECIAL_LEVEL (one level of a course)
   // What this fee is for. A level's own row wins; a course-wide row (courseLevelId null) is the
   // default for a course without levels, and the fallback for a level with no row of its own.
-  courseId     Int?
-  courseLevelId Int?   @unique
-  course       Course?      @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  level        CourseLevel? @relation(fields: [courseLevelId], references: [id], onDelete: SetNull)
-  admissionFee Int     @default(0)
-  semesterFee  Int     @default(0)
-  bcskPrice    Int? // special course price for BCSK students
-  nonBcskPrice Int? // for non-BCSK students
-  bookFee      Int?
-  displayOrder Int     @default(100)
-  active       Boolean @default(true)
+  courseId      Int?
+  courseLevelId Int?         @unique
+  course        Course?      @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  level         CourseLevel? @relation(fields: [courseLevelId], references: [id], onDelete: SetNull)
+  admissionFee  Int          @default(0)
+  semesterFee   Int          @default(0)
+  bcskPrice     Int? // special course price for BCSK students
+  nonBcskPrice  Int? // for non-BCSK students
+  bookFee       Int?
+  displayOrder  Int          @default(100)
+  active        Boolean      @default(true)
 
   @@index([courseId])
 }
@@ -420,7 +637,6 @@ model ContentPage {
   createdAt   DateTime @default(now())
 
   @@unique([slug, lang])
-
   @@index([slug, status])
 }
 
@@ -453,7 +669,7 @@ model HeroImage {
 }
 
 model GalleryAlbum {
-  id       Int    @id @default(autoincrement())
+  id       Int           @id @default(autoincrement())
   title    String
   category String? // event name / year
   coverUrl String?
@@ -461,9 +677,9 @@ model GalleryAlbum {
 }
 
 model GalleryItem {
-  id      Int     @id @default(autoincrement())
+  id      Int          @id @default(autoincrement())
   albumId Int
-  type    String  @default("IMAGE") // IMAGE | VIDEO
+  type    String       @default("IMAGE") // IMAGE | VIDEO
   url     String
   caption String?
   album   GalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
@@ -528,30 +744,30 @@ model Notification {
 }
 
 model Question {
-  id            Int      @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   studentUserId Int
   teacherUserId Int?
   subject       String
   body          String
   answer        String?
   answeredAt    DateTime?
-  createdAt     DateTime @default(now())
-  student       User  @relation("StudentQuestions", fields: [studentUserId], references: [id], onDelete: Cascade)
-  teacher       User? @relation("TeacherQuestions", fields: [teacherUserId], references: [id])
+  createdAt     DateTime  @default(now())
+  student       User      @relation("StudentQuestions", fields: [studentUserId], references: [id], onDelete: Cascade)
+  teacher       User?     @relation("TeacherQuestions", fields: [teacherUserId], references: [id])
 
   @@index([studentUserId])
   @@index([teacherUserId, answeredAt])
 }
 
 model TeacherTask {
-  id            Int      @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   teacherUserId Int
   title         String
   detail        String?
-  done          Boolean  @default(false)
+  done          Boolean   @default(false)
   dueDate       DateTime?
-  createdAt     DateTime @default(now())
-  teacher       User @relation(fields: [teacherUserId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  teacher       User      @relation(fields: [teacherUserId], references: [id], onDelete: Cascade)
 
   @@index([teacherUserId, done])
 }
@@ -573,11 +789,11 @@ model GoverningMember {
 }
 
 model CurriculumEntry {
-  id           Int    @id @default(autoincrement())
+  id           Int     @id @default(autoincrement())
   classLevel   String // PRE_PRIMARY..CLASS_5
   subject      String
   details      String?
-  displayOrder Int    @default(100)
+  displayOrder Int     @default(100)
 
   @@index([classLevel, displayOrder])
 }
@@ -588,27 +804,29 @@ model CurriculumEntry {
  * keys on CourseLevel and the classLevel strings.
  */
 model AcademicClass {
-  id             Int      @id @default(autoincrement())
-  slug           String   @unique // pre-primary, class-1 ... - the page URL
+  id             Int            @id @default(autoincrement())
+  slug           String         @unique // pre-primary, class-1 ... - the page URL
   name           String // "Pre-Primary", "Class 1"
   ageRange       String? // "Age 3-5"
   summary        String? // the card's short text
   tagline        String? // the line under the title on the class page banner
   intro          String? // "What we offer" paragraph
-  highlights     String[] @default([]) // the short items beside the intro
-  color          String   @default("green") // green | blue | purple | orange | teal | red | indigo
+  highlights     String[]       @default([]) // the short items beside the intro
+  color          String         @default("green") // green | blue | purple | orange | teal | red | indigo
   cardImageUrl   String?
   bannerImageUrl String?
-  displayOrder   Int      @default(100)
-  active         Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  displayOrder   Int            @default(100)
+  active         Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   subjects       ClassSubject[]
 
   @@index([active, displayOrder])
 }
 
-/** One book or subject taught in an AcademicClass, added from the admin panel. */
+/**
+ * One book or subject taught in an AcademicClass, added from the admin panel.
+ */
 model ClassSubject {
   id            Int           @id @default(autoincrement())
   classId       Int
@@ -635,7 +853,7 @@ model ProgressRecord {
   note          String?
   recordedAt    DateTime @default(now())
   recordedById  Int?
-  student       User @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
+  student       User     @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
 
   @@index([studentUserId, courseSlug])
 }
@@ -647,7 +865,7 @@ model GameScore {
   level         Int      @default(0)
   score         Int
   createdAt     DateTime @default(now())
-  student       User @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
+  student       User     @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
 
   @@index([studentUserId, game])
 }
@@ -659,26 +877,24 @@ model HifzProgress {
   surahName     String
   juz           Int?
   completedAt   DateTime @default(now())
-  student       User @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
+  student       User     @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
 
   @@unique([studentUserId, surahNumber])
-
   @@index([studentUserId])
 }
 
 model ExamResult {
-  id            Int      @id @default(autoincrement())
+  id            Int     @id @default(autoincrement())
   studentUserId Int
   semester      String
   subject       String
-  fullMarks     Int      @default(100)
+  fullMarks     Int     @default(100)
   marks         Int
   grade         String?
   remark        String?
-  student       User @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
+  student       User    @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
 
   @@unique([studentUserId, semester, subject])
-
   @@index([studentUserId, semester])
 }
 
@@ -689,8 +905,10 @@ model AuditLog {
   entity    String
   entityId  String?
   detail    String?
+  ip        String? // the caller's address, where the action came through HTTP
+  diff      Json? // { before, after } of the fields an edit changed
   createdAt DateTime @default(now())
-  user      User? @relation(fields: [userId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([createdAt])
@@ -717,11 +935,14 @@ model Setting {
   key   String @id // smtp_host, whatsapp_number, zoom_account, pg_client_key, stat_total_students, ...
   value String
 }
-/* ---------------------------------- CRM ----------------------------------
+
+/**
+ * ---------------------------------- CRM ----------------------------------
  * Prospective-student pipeline, ported from lms_taiba. A Lead is kept after conversion
  * (stage ENROLLED, convertedApplicationId set) so funnel reporting stays intact.
  * Stage / outcome / lost-reason values are validated in leads.schema.ts, not as enums, to
- * match the rest of this schema (status columns are plain strings). */
+ * match the rest of this schema (status columns are plain strings).
+ */
 
 model LeadSource {
   id          Int      @id @default(autoincrement())
@@ -736,36 +957,36 @@ model LeadSource {
 }
 
 model Lead {
-  id               Int       @id @default(autoincrement())
-  leadNo           String    @unique // LD-YYMM-NNNN
-  name             String
-  email            String?
-  phone            String?
-  alternatePhone   String?
-  gender           String?
-  city             String?
-  sourceId         Int?
-  source           LeadSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
-  campaign         String?
-  referredBy       String?
-  courseId         Int?
-  course           Course?   @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  stage            String    @default("NEW") // NEW | CONTACTED | QUALIFIED | APPLIED | ADMITTED | ENROLLED | LOST
-  lostReason       String?
-  lostNote         String?
-  score            Int       @default(0)
-  assignedToUserId Int?
-  assignedTo       User?     @relation("LeadOwner", fields: [assignedToUserId], references: [id], onDelete: SetNull)
-  lastContactedAt  DateTime?
-  nextFollowUpAt   DateTime?
+  id                     Int              @id @default(autoincrement())
+  leadNo                 String           @unique // LD-YYMM-NNNN
+  name                   String
+  email                  String?
+  phone                  String?
+  alternatePhone         String?
+  gender                 String?
+  city                   String?
+  sourceId               Int?
+  source                 LeadSource?      @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  campaign               String?
+  referredBy             String?
+  courseId               Int?
+  course                 Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  stage                  String           @default("NEW") // NEW | CONTACTED | QUALIFIED | APPLIED | ADMITTED | ENROLLED | LOST
+  lostReason             String?
+  lostNote               String?
+  score                  Int              @default(0)
+  assignedToUserId       Int?
+  assignedTo             User?            @relation("LeadOwner", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  lastContactedAt        DateTime?
+  nextFollowUpAt         DateTime?
   convertedApplicationId Int?
   convertedApplication   ApplicationForm? @relation(fields: [convertedApplicationId], references: [id], onDelete: SetNull)
-  convertedAt      DateTime?
-  remarks          String?
-  deletedAt        DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  activities       LeadActivity[]
+  convertedAt            DateTime?
+  remarks                String?
+  deletedAt              DateTime?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  activities             LeadActivity[]
 
   @@index([stage])
   @@index([assignedToUserId])
@@ -801,18 +1022,18 @@ model LeadActivity {
  * discounted. Codes are stored upper-case.
  */
 model Coupon {
-  id           Int       @id @default(autoincrement())
-  code         String    @unique
+  id           Int               @id @default(autoincrement())
+  code         String            @unique
   description  String?
   discountType String // PERCENT | FIXED
   value        Int
-  appliesTo    String    @default("ALL") // ALL | REGULAR | SPECIAL | RE_ADMISSION
+  appliesTo    String            @default("ALL") // ALL | REGULAR | SPECIAL | RE_ADMISSION
   maxUses      Int? // null = unlimited; counted over applications that have not been rejected
   validFrom    DateTime?
   validUntil   DateTime?
-  active       Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  active       Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
   applications ApplicationForm[]
 }
 
@@ -824,18 +1045,18 @@ model Coupon {
  * logic and stays in code (common/menu-permissions.ts), deliberately not editable as data.
  */
 model Menu {
-  id           Int      @id @default(autoincrement())
-  key          String   @unique // stable identifier routes and grants refer to
+  id           Int                  @id @default(autoincrement())
+  key          String               @unique // stable identifier routes and grants refer to
   panel        String // ADMIN | TEACHER | STUDENT
   module       String // the group it appears under
   label        String
   href         String // the page it opens
   note         String?
-  actions      String   @default("access") // comma list of the switches this menu offers (admin menus: derived from the capability map)
-  displayOrder Int      @default(0)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  actions      String               @default("access") // comma list of the switches this menu offers (admin menus: derived from the capability map)
+  displayOrder Int                  @default(0)
+  active       Boolean              @default(true)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
   permissions  UserMenuPermission[]
 
   @@index([panel, displayOrder])

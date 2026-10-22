@@ -1,5 +1,5 @@
 import { permissionsFor, type Permission } from "./permissions";
-import type { Role } from "./constants";
+import { ADMIN_ROLES, type Role } from "./constants";
 
 /**
  * Menus and who may use them - the logic behind the `Menu` and `UserMenuPermission` tables.
@@ -30,7 +30,7 @@ export type Panel = (typeof PANELS)[number];
 
 /** The panel a role belongs to, or null for a role with no panel. */
 export const panelOfRole = (role: string): Panel | null =>
-  role === "STUDENT" ? "STUDENT" : role === "TEACHER" ? "TEACHER" : ["ADMIN_SUPPORT", "IT_SUPPORT", "SUPER_ADMIN"].includes(role) ? "ADMIN" : null;
+  role === "STUDENT" ? "STUDENT" : role === "TEACHER" ? "TEACHER" : (ADMIN_ROLES as string[]).includes(role) ? "ADMIN" : null;
 
 /** Where each panel lives, to check a menu's link belongs to its panel. */
 export const PANEL_PREFIX: Record<Panel, string> = { ADMIN: "/admin/", TEACHER: "/office/", STUDENT: "/classroom/" };
@@ -131,7 +131,7 @@ export const DEFAULT_MENUS: MenuRow[] = SEEDS.map((s, i) => ({
 }));
 
 /** Roles whose menus can be customised. SUPER_ADMIN always holds everything and is never restricted. */
-export const CUSTOMISABLE_ROLES: readonly Role[] = ["ADMIN_SUPPORT", "IT_SUPPORT", "TEACHER", "STUDENT"];
+export const CUSTOMISABLE_ROLES: readonly Role[] = ["HEAD_MASTER", "ADMIN_SUPPORT", "IT_SUPPORT", "TEACHER", "STUDENT"];
 
 const emptyGrid = (): MenuGrid => ({ access: false, insert: false, update: false, delete: false });
 

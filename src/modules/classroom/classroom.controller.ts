@@ -82,6 +82,11 @@ export class ClassroomController {
   @Get("attendance")
   attendance(@CurrentActor() a: Actor) { return this.classroom.attendance(this.student(a)); }
 
+  /** LMS B1: the student's class, section, roll number and subjects this term. */
+  @RequireMenu("classroom.routine")
+  @Get("sections")
+  sections(@CurrentActor() a: Actor) { return this.classroom.mySections(this.student(a)); }
+
   @RequireMenu("classroom.routine")
   @Get("routine")
   routine(@CurrentActor() a: Actor) { return this.classroom.routine(this.student(a)); }

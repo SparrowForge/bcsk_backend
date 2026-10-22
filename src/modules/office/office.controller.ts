@@ -43,6 +43,17 @@ export class OfficeController {
   @Get("classes")
   classes(@CurrentActor() a: Actor) { return this.office.myClasses(this.teacher(a)); }
 
+  /** LMS B1: the sections this teacher teaches or leads this term. */
+  @RequireMenu("office.classes")
+  @Get("sections")
+  sections(@CurrentActor() a: Actor) { return this.office.mySections(this.teacher(a)); }
+
+  @RequireMenu("office.classes")
+  @Get("sections/:id/students")
+  roster(@Param("id") raw: string, @CurrentActor() a: Actor) {
+    return this.office.sectionRoster(this.teacher(a), idParam.parse(raw));
+  }
+
   @RequireMenu("office.classes")
   @Get("classes/:id")
   detail(@Param("id") raw: string, @CurrentActor() a: Actor) {

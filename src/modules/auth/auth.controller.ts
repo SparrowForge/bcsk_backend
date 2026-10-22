@@ -7,6 +7,7 @@ import { RefreshTokenService } from "./refresh-token.service";
 import { CurrentActor, Public } from "../../common/decorators/actor.decorator";
 import { actorHas } from "../../common/actor";
 import { MenuCatalogService } from "../../common/menu-catalog.service";
+import { AuditService } from "../../common/audit.service";
 import { PERMISSIONS } from "../../common/permissions";
 import { unauthenticated } from "../../common/errors/app-error";
 import { ADMIN_ROLES, type Role } from "../../common/constants";
@@ -33,6 +34,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly refresh: RefreshTokenService,
     private readonly menuCatalog: MenuCatalogService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -44,14 +46,19 @@ export class AuthController {
   @Post("login")
   async login(
     @Body() body: unknown,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { loginId, password, surface, deviceName } = loginSchema.parse(body);
+    const ip = clientIp(req);
     const user = await this.auth.verifyCredentials(loginId, password, ROLES_FOR[surface]);
     if (!user) {
+      // The reason stays in the operator log; the audit row records only that an attempt failed.
+      await this.audit.record(null, "LOGIN_FAILED", "User", loginId.slice(0, 64), surface, { ip });
       // One message for every failure — never reveal which half was wrong.
       throw unauthenticated("That ID and password combination doesn't match our records.");
     }
+    await this.audit.record(user.id, "LOGIN", "User", user.id, surface, { ip });
 
     const token = await this.auth.signSession(user);
     res.cookie(SESSION_COOKIE, token, {
@@ -68,6 +75,8 @@ export class AuthController {
 
     return {
       token,
+      // Seconds the access token lives; a client refreshes before this rather than after a 401.
+      expiresIn: this.auth.sessionMaxAgeSeconds,
       refreshToken,
       user: {
         userId: user.id,
@@ -93,6 +102,7 @@ export class AuthController {
     if (!user) throw unauthenticated("Your session has expired. Please sign in again.");
     return {
       token: await this.auth.signSession(user),
+      expiresIn: this.auth.sessionMaxAgeSeconds,
       refreshToken: rotated.refreshToken,
       user: {
         userId: user.id, loginId: user.loginId, role: user.role,
@@ -145,6 +155,7 @@ export class AuthController {
       loginId: actor.loginId,
       role: actor.role,
       name: actor.name,
+      instituteId: actor.instituteId,
       mustChangePassword: actor.mustChangePassword,
       permissions: PERMISSIONS.filter((p) => actorHas(actor, p)),
       // The menus this person's sidebar is built from: active, in their own panel, Access held.

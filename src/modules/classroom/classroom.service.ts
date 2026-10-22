@@ -93,6 +93,58 @@ export class ClassroomService {
     });
   }
 
+  /**
+   * LMS B1: the student's own sections this term - class, section, roll number, class teacher,
+   * and each subject with whoever teaches it to that section.
+   */
+  async mySections(actor: Actor) {
+    const places = await this.prisma.sectionEnrollment.findMany({
+      where: { studentUserId: actor.userId, status: "ACTIVE", batch: { term: { instituteId: actor.instituteId, isCurrent: true } } },
+      orderBy: { id: "asc" },
+      select: {
+        rollNo: true,
+        section: {
+          select: {
+            id: true, name: true, room: true,
+            classTeacher: { select: { user: { select: { name: true } } } },
+            assignments: { select: { subjectId: true, teacher: { select: { user: { select: { name: true } } } } } },
+            batch: {
+              select: {
+                name: true,
+                term: { select: { code: true, name: true } },
+                courseLevel: {
+                  select: {
+                    id: true, name: true, course: { select: { name: true } },
+                    curriculum: {
+                      orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+                      select: { fullMarks: true, passMarks: true, isOptional: true, subject: { select: { id: true, code: true, name: true } } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    return places.map(({ rollNo, section }) => ({
+      rollNo,
+      sectionId: section.id,
+      section: section.name,
+      room: section.room,
+      class: `${section.batch.courseLevel.course.name} - ${section.batch.courseLevel.name}`,
+      term: section.batch.term,
+      classTeacher: section.classTeacher?.user.name ?? null,
+      subjects: section.batch.courseLevel.curriculum.map((c) => ({
+        ...c.subject,
+        fullMarks: c.fullMarks,
+        passMarks: c.passMarks,
+        isOptional: c.isOptional,
+        teachers: section.assignments.filter((a) => a.subjectId === c.subject.id).map((a) => a.teacher.user.name),
+      })),
+    }));
+  }
+
   async routine(actor: Actor) {
     const enrollments = await this.prisma.enrollment.findMany({
       where: { studentUserId: actor.userId, semester: SEMESTER_CURRENT, status: "ACTIVE" },

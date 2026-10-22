@@ -17,6 +17,7 @@
     "db:seed-academic": "tsx prisma/seed-academic.ts",
     "db:rotate-passwords": "tsx prisma/rotate-passwords.ts",
     "db:backfill-payer": "tsx prisma/backfill-payer-user-id.ts",
+    "db:backfill-b1": "tsx prisma/backfill-b1.ts",
     "postinstall": "prisma generate && node scripts/bundle-vendor.mjs"
   },
   "prisma": {

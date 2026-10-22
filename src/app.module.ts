@@ -23,6 +23,7 @@ import { LeadsModule } from "./modules/leads/leads.module";
 import { CouponModule } from "./modules/coupon/coupon.module";
 import { AcademicModule } from "./modules/academic/academic.module";
 import { UserPermissionModule } from "./modules/user-permission/user-permission.module";
+import { StructureModule } from "./modules/structure/structure.module";
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { UserPermissionModule } from "./modules/user-permission/user-permission.
     CouponModule,
     AcademicModule,
     UserPermissionModule,
+    StructureModule,
     HealthModule,
   ],
   providers: [

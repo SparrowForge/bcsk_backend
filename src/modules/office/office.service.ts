@@ -3,6 +3,7 @@ import { PrismaService } from "../../database/prisma.service";
 import { forbidden, notFound, unprocessable } from "../../common/errors/app-error";
 import { SEMESTER_CURRENT, schoolToday } from "../../common/constants";
 import type { Actor } from "../../common/actor";
+import { assertTeaches, teacherProfileId } from "../structure/teaching-scope";
 
 /** Attendance values are validated server-side, never trusted from a form. */
 const VALID_ATTENDANCE = ["PRESENT", "ABSENT", "LATE"];
@@ -21,14 +22,63 @@ const VALID_DESK_STATUS = ["DESK", "OFFLINE"];
 export class OfficeService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * A class is the teacher's when it names them, or (LMS B1) when it teaches a section and
+   * subject they are assigned to - so reassigning a subject moves the class with it.
+   */
   private async ownSession(actor: Actor, classSessionId: number) {
     const cs = await this.prisma.classSession.findUnique({
       where: { id: classSessionId },
       include: { teacher: true },
     });
     if (!cs) throw notFound("Class");
-    if (cs.teacher?.userId !== actor.userId) throw forbidden("That is not your class.");
-    return cs;
+    if (cs.teacher?.userId === actor.userId) return cs;
+    if (cs.sectionId != null && cs.subjectId != null) {
+      const assigned = await this.prisma.teacherAssignment.findFirst({
+        where: { sectionId: cs.sectionId, subjectId: cs.subjectId, teacher: { userId: actor.userId } },
+        select: { id: true },
+      });
+      if (assigned) return cs;
+    }
+    throw forbidden("That is not your class.");
+  }
+
+  /**
+   * LMS B1: the sections this teacher works in this term - those they teach a subject in, and
+   * those they are class teacher of - with their own subjects in each.
+   */
+  async mySections(actor: Actor) {
+    const profileId = await teacherProfileId(this.prisma, actor);
+    const sections = await this.prisma.section.findMany({
+      where: {
+        active: true,
+        batch: { term: { instituteId: actor.instituteId, isCurrent: true } },
+        OR: [{ classTeacherId: profileId }, { assignments: { some: { teacherProfileId: profileId } } }],
+      },
+      orderBy: [{ batchId: "asc" }, { name: "asc" }],
+      select: {
+        id: true, name: true, room: true, classTeacherId: true,
+        batch: { select: { id: true, name: true, term: { select: { code: true, name: true } }, courseLevel: { select: { id: true, name: true } } } },
+        assignments: { where: { teacherProfileId: profileId }, select: { subject: { select: { id: true, code: true, name: true } } } },
+        _count: { select: { enrollments: { where: { status: "ACTIVE" } } } },
+      },
+    });
+    return sections.map(({ classTeacherId, assignments, ...s }) => ({
+      ...s,
+      isClassTeacher: classTeacherId === profileId,
+      subjects: assignments.map((a) => a.subject),
+    }));
+  }
+
+  /** The students of one of the teacher's sections. Names and roll numbers only - no family data. */
+  async sectionRoster(actor: Actor, sectionId: number) {
+    const scope = await assertTeaches(this.prisma, actor, sectionId);
+    const students = await this.prisma.sectionEnrollment.findMany({
+      where: { sectionId, status: "ACTIVE" },
+      orderBy: [{ rollNo: { sort: "asc", nulls: "last" } }, { id: "asc" }],
+      select: { rollNo: true, student: { select: { id: true, name: true, studentProfile: { select: { studentId: true, photoUrl: true } } } } },
+    });
+    return { sectionId, isClassTeacher: scope.isClassTeacher, students };
   }
 
   async dashboard(actor: Actor) {

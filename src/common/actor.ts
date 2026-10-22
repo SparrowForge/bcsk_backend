@@ -1,4 +1,4 @@
-import { ADMIN_ROLES, type Role } from "./constants";
+import { ADMIN_ROLES, DEFAULT_INSTITUTE_ID, type Role } from "./constants";
 import { permissionsFor, type Permission } from "./permissions";
 import type { MenuFlag, MenuGrid } from "./menu-permissions";
 import { forbidden, unauthenticated } from "./errors/app-error";
@@ -21,6 +21,11 @@ export type Actor = {
   loginId: string;
   role: Role;
   name: string;
+  /**
+   * The institute this account belongs to, read live from the database with `active` - never
+   * from the token. Every staff query is bounded by it; see `institute-scope.ts`.
+   */
+  instituteId: number;
   /** SEC-2: credential was issued by the office and has not yet been replaced by its holder. */
   mustChangePassword: boolean;
   transport: ActorTransport;
@@ -55,6 +60,8 @@ export const SYSTEM_ACTOR: Actor = {
   loginId: "system",
   role: "SUPER_ADMIN",
   name: "System",
+  // A job working across institutes must say so by building its own actor per institute.
+  instituteId: DEFAULT_INSTITUTE_ID,
   mustChangePassword: false,
   transport: "system",
 };

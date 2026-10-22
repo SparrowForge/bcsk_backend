@@ -215,6 +215,11 @@ export class AdminController {
     return this.admin.addLevel(idParam.parse(raw), a);
   }
 
+  @RequirePermission("courses:manage") @Delete("levels/:id")
+  deleteLevel(@Param("id") raw: string, @CurrentActor() a: Actor) {
+    return this.admin.deleteLevel(idParam.parse(raw), a);
+  }
+
   /* --------------------------------- fees ---------------------------------- */
 
   @RequirePermission("fees:manage") @Get("fees")

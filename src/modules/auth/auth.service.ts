@@ -29,10 +29,27 @@ export const SESSION_COOKIE = "bcsk_session";
 const RESET_TTL_MS = 60 * 60 * 1000;
 const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
 
+/**
+ * Whether an access token predates the holder's last password change, and so must stop working.
+ * A JWT cannot be recalled, so this is how a reset, an office reset or a change signs out every
+ * other session: `passwordChangedAt` is read live with `active`. Compared in whole seconds (`iat`
+ * has no finer grain), so the token issued in the same request as the change survives.
+ */
+export function issuedBeforePasswordChange(iat: number | undefined, passwordChangedAt: Date | null): boolean {
+  if (!passwordChangedAt) return false;
+  if (typeof iat !== "number") return true;
+  return iat < Math.floor(passwordChangedAt.getTime() / 1000);
+}
+
 @Injectable()
 export class AuthService {
   private readonly secret = new TextEncoder().encode(requiredSecret("JWT_SECRET"));
-  private readonly sessionHours = intFromEnv("SESSION_HOURS", 8);
+  /**
+   * Access-token lifetime. `ACCESS_TOKEN_MINUTES` is the B0 setting (30 once the web refreshes
+   * silently); until it is set the old `SESSION_HOURS` still decides, so deploying this before
+   * the frontend's refresh support does not sign every web user out after half an hour.
+   */
+  private readonly accessMinutes = intFromEnv("ACCESS_TOKEN_MINUTES", intFromEnv("SESSION_HOURS", 8) * 60);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -134,18 +151,18 @@ export class AuthService {
     return this.prisma.user.findFirst({ where: { id, active: true } });
   }
 
-  /** Issue a session JWT. Used for the web cookie today; Phase F adds access/refresh pairs. */
+  /** Issue an access JWT - the web cookie's value and the mobile bearer token alike. */
   async signSession(user: { id: number; loginId: string; role: string; name: string }): Promise<string> {
     return new SignJWT({ loginId: user.loginId, role: user.role, name: user.name })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(String(user.id))
       .setIssuedAt()
-      .setExpirationTime(`${this.sessionHours}h`)
+      .setExpirationTime(`${this.accessMinutes}m`)
       .sign(this.secret);
   }
 
   get sessionMaxAgeSeconds(): number {
-    return this.sessionHours * 3600;
+    return this.accessMinutes * 60;
   }
 
   /**
@@ -165,6 +182,8 @@ export class AuthService {
         select: {
           active: true,
           mustChangePassword: true,
+          instituteId: true,
+          passwordChangedAt: true,
           // The per-user menu grid rides along on the lookup this already does, so custom
           // permissions cost no extra round trip.
           menuPermissions: {
@@ -173,6 +192,7 @@ export class AuthService {
         },
       });
       if (!user?.active) return null;
+      if (issuedBeforePasswordChange(payload.iat, user.passwordChangedAt)) return null;
       const access = effectiveAccess(
         payload.role as Role,
         user.menuPermissions.map((r) => ({ menuKey: r.menu.key, canAccess: r.canAccess, canInsert: r.canInsert, canUpdate: r.canUpdate, canDelete: r.canDelete })),
@@ -183,6 +203,7 @@ export class AuthService {
         loginId: payload.loginId as string,
         role: payload.role as Role,
         name: payload.name as string,
+        instituteId: user.instituteId,
         mustChangePassword: user.mustChangePassword,
         transport,
         permissions: access.permissions,

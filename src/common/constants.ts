@@ -1,13 +1,27 @@
 export const ROLES = {
   STUDENT: "STUDENT",
   TEACHER: "TEACHER",
+  /** Runs the institute's academics: structure, routine, exams, approvals. Signs in at /admin. */
+  HEAD_MASTER: "HEAD_MASTER",
   ADMIN_SUPPORT: "ADMIN_SUPPORT",
   IT_SUPPORT: "IT_SUPPORT",
   SUPER_ADMIN: "SUPER_ADMIN",
 } as const;
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
-export const ADMIN_ROLES: Role[] = [ROLES.ADMIN_SUPPORT, ROLES.IT_SUPPORT, ROLES.SUPER_ADMIN];
+export const ADMIN_ROLES: Role[] = [ROLES.HEAD_MASTER, ROLES.ADMIN_SUPPORT, ROLES.IT_SUPPORT, ROLES.SUPER_ADMIN];
+
+/**
+ * Roles only a super admin may hand out. Each acts for the whole institute, so a `users:manage`
+ * holder (IT support) creating one would be a privilege escalation.
+ */
+export const PRIVILEGED_ROLES: Role[] = [ROLES.SUPER_ADMIN, ROLES.HEAD_MASTER];
+
+/**
+ * The founding institute (BCSK), inserted by the B0 migration. Rows created where no staff
+ * actor is present - public admission activation, the seeds - belong to it.
+ */
+export const DEFAULT_INSTITUTE_ID = 1;
 
 export const CLASS_LEVELS = [
   { key: "PRE_PRIMARY", label: "Pre-Primary" },

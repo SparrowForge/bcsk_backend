@@ -411,12 +411,40 @@ export class AdminService {
   }
 
   async addLevel(courseId: number, actor: Actor) {
-    const count = await this.prisma.courseLevel.count({ where: { courseId } });
+    // After the max, not the count: a count repeats an order and a name once a level is deleted.
+    const { _max } = await this.prisma.courseLevel.aggregate({ where: { courseId }, _max: { displayOrder: true } });
+    const next = _max.displayOrder === null ? 0 : _max.displayOrder + 1;
     const row = await this.prisma.courseLevel.create({
-      data: { courseId, name: `Level ${count}`, displayOrder: count, syllabus: "" },
+      data: { courseId, name: `Level ${next}`, displayOrder: next, syllabus: "" },
     });
     await this.audit.record(actor.userId, "COURSE_LEVEL_CREATE", "Course", courseId);
     return row;
+  }
+
+  /**
+   * Removes a level nothing depends on yet. A level with classes or applications is refused
+   * rather than detached: its classes would lose their level, and an application its family's
+   * choice, which activation enrols from. A Regular Course level (`code` set) is named as text
+   * by other tables. The level's own fee row prices nothing once the level is gone, so it goes too.
+   */
+  async deleteLevel(id: number, actor: Actor) {
+    const level = await this.prisma.courseLevel.findUnique({
+      where: { id },
+      include: { _count: { select: { sessions: true, applications: true } } },
+    });
+    if (!level) throw notFound("Level");
+    if (level.code) throw conflict(`${level.name} is a Regular Course class and can't be deleted.`);
+    const { sessions, applications } = level._count;
+    if (sessions) throw conflict(`${level.name} has ${sessions} class${sessions === 1 ? "" : "es"}. Move or delete them first.`);
+    if (applications) {
+      throw conflict(`${level.name} was chosen on ${applications} application${applications === 1 ? "" : "s"}, so it can't be deleted.`);
+    }
+    await this.prisma.$transaction([
+      this.prisma.feeConfig.deleteMany({ where: { courseLevelId: id } }),
+      this.prisma.courseLevel.delete({ where: { id } }),
+    ]);
+    await this.audit.record(actor.userId, "COURSE_LEVEL_DELETE", "CourseLevel", id, level.name);
+    return { id };
   }
 
   /* ---------------------------------- fees --------------------------------- */

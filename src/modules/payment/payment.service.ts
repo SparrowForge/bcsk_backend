@@ -4,7 +4,8 @@ import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { MailService } from "../../common/mail.service";
-import { SEMESTER_CURRENT } from "../../common/constants";
+import { DEFAULT_INSTITUTE_ID, SEMESTER_CURRENT } from "../../common/constants";
+import { autoPlace } from "../structure/section-placement";
 import { log, errMessage } from "../../common/logger";
 import { conflict, misconfigured, notFound, upstreamFailed } from "../../common/errors/app-error";
 import { assertPaymentToken } from "./payment-token";
@@ -440,6 +441,21 @@ export class PaymentService {
     });
   }
 
+  /**
+   * LMS B1: the class (CourseLevel) an admission is for, to place the student in one of its
+   * sections. A regular grade is the Regular Course level with that code; a special course is
+   * the level the family chose. Null when neither is known - the office places the student.
+   */
+  private async admissionLevelId(app: { type: string; grade: string | null; courseLevelId: number | null }): Promise<number | null> {
+    if (app.type === "SPECIAL") return app.courseLevelId;
+    if (!app.grade) return null;
+    const level = await this.prisma.courseLevel.findFirst({
+      where: { code: app.grade, course: { instituteId: DEFAULT_INSTITUTE_ID, type: "REGULAR" } },
+      select: { id: true },
+    });
+    return level?.id ?? null;
+  }
+
   /** Generate the next Student ID. Called inside the activation transaction. */
   async nextStudentId(tx: Prisma.TransactionClient): Promise<string> {
     const year = new Date().getFullYear();
@@ -457,7 +473,8 @@ export class PaymentService {
    * enrolled into the chosen class for this semester, and the application is linked to them.
    */
   private async renewEnrolment(app: {
-    id: number; studentId: string | null; grade: string | null; email: string | null; applicantName: string;
+    id: number; type: string; studentId: string | null; grade: string | null; courseLevelId: number | null;
+    email: string | null; applicantName: string;
   }): Promise<{ studentId: string }> {
     const profile = app.studentId
       ? await this.prisma.studentProfile.findUnique({ where: { studentId: app.studentId } })
@@ -468,7 +485,9 @@ export class PaymentService {
       where: { classLevel: grade, semester: SEMESTER_CURRENT, active: true },
       select: { id: true },
     });
+    const levelId = await this.admissionLevelId(app);
     await this.prisma.$transaction(async (tx) => {
+      if (levelId) await autoPlace(tx, { studentUserId: profile.userId, courseLevelId: levelId, instituteId: DEFAULT_INSTITUTE_ID });
       const claimed = await tx.applicationForm.updateMany({
         where: { id: app.id, createdStudentUserId: null },
         data: { status: "APPROVED", createdStudentUserId: profile.userId },
@@ -559,6 +578,7 @@ export class PaymentService {
       }
     }
     const unplaced = sessionIds.length === 0;
+    const levelId = await this.admissionLevelId(app);
 
     const studentId = await this.prisma.$transaction(async (tx) => {
       const id = await this.nextStudentId(tx);
@@ -587,10 +607,14 @@ export class PaymentService {
               addressKorea: app.addressKorea,
               addressBangladesh: app.addressBangladesh,
               emergencyContact: app.emergencyContact,
+              admissionDate: new Date(),
             },
           },
         },
       });
+      // LMS B1: a seat in a section of the class, in the current term, with a roll number.
+      // No current term or no section with room leaves the student for the office to place.
+      if (levelId) await autoPlace(tx, { studentUserId: user.id, courseLevelId: levelId, instituteId: DEFAULT_INSTITUTE_ID });
       if (sessionIds.length > 0) {
         await tx.enrollment.createMany({
           data: sessionIds.map((classSessionId) => ({

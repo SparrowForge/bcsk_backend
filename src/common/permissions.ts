@@ -38,6 +38,24 @@ export const PERMISSIONS = [
   "users:manage",
   "settings:manage",
   "audit:read",
+  // LMS (phase B0 declares them; each module's phase adds the routes that enforce them)
+  "institute:manage", // institute profile, logo, signatory
+  "departments:manage",
+  "subjects:manage",
+  "sections:manage", // terms, batches, sections, enrolment into sections
+  "staff:read", // teacher list and profiles
+  "students:read", // student list, profiles, progress
+  "calendar:manage",
+  "attendance:record", // any section; teachers record their own through the office panel
+  "materials:manage",
+  "assignments:manage",
+  "exams:manage", // exams, papers, schedule
+  "results:approve", // approve or return a section's results
+  "results:publish",
+  "leave:review",
+  "leave:decide",
+  "transfer:decide",
+  "analytics:read",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -69,8 +87,43 @@ const ADMIN_SUPPORT_PERMISSIONS: Permission[] = [
 /** IT support: accounts and the support queue. Deliberately no money, no admissions. */
 const IT_SUPPORT_PERMISSIONS: Permission[] = ["users:manage", "tickets:manage"];
 
+/**
+ * Head Master: the institute's academics end to end, plus approving what teachers produce.
+ * Sees admissions and payments (read and export) but never decides, verifies or refunds -
+ * those stay with the office. No CRM or website content, and no `users:manage` or
+ * `permissions:manage`, so the role cannot widen its own reach.
+ * Deliberately no marks entry: the person who approves results does not also write them.
+ */
+const HEAD_MASTER_PERMISSIONS: Permission[] = [
+  "admissions:read",
+  "payments:read",
+  "payments:export",
+  "institute:manage",
+  "departments:manage",
+  "subjects:manage",
+  "sections:manage",
+  "courses:manage",
+  "scheduling:manage",
+  "staff:read",
+  "students:read",
+  "calendar:manage",
+  "attendance:record",
+  "materials:manage",
+  "assignments:manage",
+  "exams:manage",
+  "results:approve",
+  "results:publish",
+  "reports:manage",
+  "leave:review",
+  "leave:decide",
+  "transfer:decide",
+  "analytics:read",
+  "audit:read",
+];
+
 const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   [ROLES.SUPER_ADMIN]: PERMISSIONS,
+  [ROLES.HEAD_MASTER]: HEAD_MASTER_PERMISSIONS,
   [ROLES.ADMIN_SUPPORT]: ADMIN_SUPPORT_PERMISSIONS,
   [ROLES.IT_SUPPORT]: IT_SUPPORT_PERMISSIONS,
   [ROLES.TEACHER]: [],
