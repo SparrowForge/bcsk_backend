@@ -32,26 +32,450 @@ model FileBlob {
  * columns files rows made by public flows (admission activation) and the seeds under it.
  */
 model Institute {
-  id             Int            @id @default(autoincrement())
-  code           String         @unique // short stable key: BCSK
-  name           String
-  nameBn         String?
-  nameKo         String?
-  address        String?
-  phone          String?
-  email          String?
-  website        String?
-  logoUrl        String?
-  headMasterName String? // printed under the signature on reports and certificates
-  signatureUrl   String?
-  active         Boolean        @default(true)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  users          User[]
-  courses        Course[]
-  departments    Department[]
-  terms          AcademicTerm[]
-  subjects       Subject[]
+  id                  Int                   @id @default(autoincrement())
+  code                String                @unique // short stable key: BCSK
+  name                String
+  nameBn              String?
+  nameKo              String?
+  address             String?
+  phone               String?
+  email               String?
+  website             String?
+  logoUrl             String?
+  headMasterName      String? // printed under the signature on reports and certificates
+  signatureUrl        String?
+  active              Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  users               User[]
+  courses             Course[]
+  departments         Department[]
+  terms               AcademicTerm[]
+  subjects            Subject[]
+  calendarEvents      CalendarEvent[]
+  gradingSchemes      GradingScheme[]
+  exams               Exam[]
+  templates           DocumentTemplate[]
+  // How equal results are ranked (LMS B5): SHARED gives both the same place and skips the next
+  // (1, 1, 3); SPLIT orders them by total marks, then roll number (1, 2, 3).
+  rankTies            String                @default("SHARED")
+  // Leave a class teacher may approve alone, in days (LMS B6). 0: every leave goes to the Head Master.
+  leaveTeacherMaxDays Int                   @default(0)
+  leaves              LeaveApplication[]
+  transfers           TransferApplication[]
+}
+
+/**
+ * -------------------------------------------------------- leave and transfer (LMS B6)
+ */
+
+/**
+ * A student's leave request. PENDING -> REVIEWED (class teacher recommends) -> APPROVED or
+ * REJECTED (Head Master; or the class teacher alone for leave of at most the institute's
+ * `leaveTeacherMaxDays`). The student may CANCEL until it is decided. Approval marks the
+ * student's classes on those days EXCUSED.
+ */
+model LeaveApplication {
+  id             Int       @id @default(autoincrement())
+  instituteId    Int
+  institute      Institute @relation(fields: [instituteId], references: [id])
+  studentUserId  Int
+  student        User      @relation("StudentLeaves", fields: [studentUserId], references: [id], onDelete: Cascade)
+  sectionId      Int? // the section at the time, which decides the class teacher
+  fromDate       DateTime // school days at midnight UTC, both inclusive
+  toDate         DateTime
+  days           Int
+  reason         String
+  attachmentUrl  String? // a doctor's note, under leave/
+  status         String    @default("PENDING") // PENDING | REVIEWED | APPROVED | REJECTED | CANCELLED
+  recommendation String? // APPROVE | REJECT, the class teacher's
+  reviewedById   Int?
+  reviewedAt     DateTime?
+  reviewNote     String?
+  decidedById    Int?
+  decidedAt      DateTime?
+  decisionNote   String?
+  excusedMarks   Int       @default(0) // attendance marks set EXCUSED on approval
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([instituteId, status])
+  @@index([studentUserId])
+  @@index([sectionId, status])
+}
+
+/**
+ * A student's transfer out. SUBMITTED -> VERIFIED (the office has cleared dues and library) ->
+ * APPROVED (Head Master: the letter is issued, the student is marked TRANSFERRED and leaves
+ * their sections) or REJECTED. The student may CANCEL until it is decided.
+ */
+model TransferApplication {
+  id             Int       @id @default(autoincrement())
+  instituteId    Int
+  institute      Institute @relation(fields: [instituteId], references: [id])
+  studentUserId  Int
+  student        User      @relation("StudentTransfers", fields: [studentUserId], references: [id], onDelete: Cascade)
+  sectionId      Int?
+  destination    String // the school the student is moving to
+  reason         String
+  effectiveDate  DateTime
+  status         String    @default("SUBMITTED") // SUBMITTED | VERIFIED | APPROVED | REJECTED | CANCELLED
+  duesCleared    Boolean   @default(false)
+  libraryCleared Boolean   @default(false)
+  verifiedById   Int?
+  verifiedAt     DateTime?
+  verifyNote     String?
+  decidedById    Int?
+  decidedAt      DateTime?
+  decisionNote   String?
+  letterSerial   String?   @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([instituteId, status])
+  @@index([studentUserId])
+}
+
+/**
+ * ------------------------------------------------------- results and documents (LMS B5)
+ */
+
+/**
+ * The results of one exam for one section, as a unit of approval:
+ * PROCESSED (computed from submitted marks) -> APPROVED (marks locked) -> PUBLISHED (students
+ * see them). RETURNED sends the section's marks back to its teachers. A published section can be
+ * withdrawn by the Head Master, back to APPROVED, with a reason.
+ */
+model SectionResult {
+  id            Int       @id @default(autoincrement())
+  examId        Int
+  exam          Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  sectionId     Int
+  section       Section   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  status        String    @default("PROCESSED") // PROCESSED | APPROVED | RETURNED | PUBLISHED
+  processedAt   DateTime  @default(now())
+  processedById Int?
+  approvedById  Int?
+  approvedAt    DateTime?
+  publishedById Int?
+  publishedAt   DateTime?
+  note          String? // why it was returned or withdrawn
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([examId, sectionId])
+}
+
+/**
+ * One student's result in one exam: totals, GPA or overall grade, and places.
+ */
+model ResultSummary {
+  id              Int          @id @default(autoincrement())
+  examId          Int
+  exam            Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  sectionId       Int
+  studentUserId   Int
+  student         User         @relation("StudentResults", fields: [studentUserId], references: [id], onDelete: Cascade)
+  rollNo          Int?
+  totalObtained   Float
+  totalFull       Int
+  percent         Float
+  gpa             Float? // null for a letter scheme
+  grade           String
+  passed          Boolean
+  failedSubjects  Int
+  sectionPosition Int?
+  classPosition   Int?
+  // Held back from this one student (unpaid dues, a disciplinary case) while the section publishes.
+  // Survives re-processing; places are still computed, so releasing it later changes nobody else's.
+  withheld        Boolean      @default(false)
+  withheldReason  String?
+  withheldAt      DateTime?
+  withheldById    Int?
+  createdAt       DateTime     @default(now())
+  lines           ResultLine[]
+
+  @@unique([examId, studentUserId])
+  @@index([examId, sectionId])
+  @@index([studentUserId])
+}
+
+/**
+ * One subject of a student's result, frozen at processing so a later edit never changes it.
+ */
+model ResultLine {
+  id          Int           @id @default(autoincrement())
+  summaryId   Int
+  summary     ResultSummary @relation(fields: [summaryId], references: [id], onDelete: Cascade)
+  paperId     Int
+  subjectName String
+  fullMarks   Int
+  passMarks   Int
+  obtained    Float?
+  isAbsent    Boolean       @default(false)
+  percent     Float
+  grade       String
+  gradePoint  Float?
+  passed      Boolean
+  isOptional  Boolean       @default(false)
+
+  @@index([summaryId])
+}
+
+/**
+ * The wording of a printed document, per type and language, editable by the Head Master so the
+ * school changes a certificate's text without a deploy. `body` may use the placeholders listed
+ * in `documents/templates.ts`, such as {{name}} and {{class}}.
+ */
+model DocumentTemplate {
+  id             Int       @id @default(autoincrement())
+  instituteId    Int
+  institute      Institute @relation(fields: [instituteId], references: [id])
+  type           String // COMPLETION | CHARACTER | ENROLLMENT | TRANSFER_LETTER | MARK_SHEET
+  lang           String    @default("en") // en | bn | ko
+  title          String
+  body           String
+  signatoryName  String?
+  signatoryTitle String?
+  updatedById    Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([instituteId, type, lang])
+}
+
+/**
+ * ------------------------------------------------------------- exams and marks (LMS B4)
+ */
+
+/**
+ * How a percentage becomes a grade. Each band holds its lower bound; it runs up to the next
+ * band's, the top one to 100. One band must start at 0, so every percentage has a grade.
+ * Bangladesh GPA 5.0 is seeded for the founding institute; a school may add its own.
+ */
+model GradingScheme {
+  id          Int         @id @default(autoincrement())
+  instituteId Int
+  institute   Institute   @relation(fields: [instituteId], references: [id])
+  name        String
+  kind        String      @default("GPA") // GPA (grade points) | LETTER (letters only)
+  isDefault   Boolean     @default(false) // at most one per institute; the service keeps it so
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  bands       GradeBand[]
+  exams       Exam[]
+
+  @@unique([instituteId, name])
+}
+
+model GradeBand {
+  id         Int           @id @default(autoincrement())
+  schemeId   Int
+  scheme     GradingScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  minPercent Float
+  grade      String // A+, A, A-, ... F
+  gradePoint Float? // 5.0 .. 0.0 for a GPA scheme
+  passing    Boolean       @default(true)
+  remark     String? // "Outstanding", "Fail"
+
+  @@unique([schemeId, minPercent])
+}
+
+/**
+ * An examination of a term - "Half-yearly 2026" - sat by the classes its papers name.
+ */
+model Exam {
+  id              Int             @id @default(autoincrement())
+  instituteId     Int
+  institute       Institute       @relation(fields: [instituteId], references: [id])
+  termId          Int
+  term            AcademicTerm    @relation(fields: [termId], references: [id])
+  name            String
+  type            String          @default("TERM") // CLASS_TEST | MIDTERM | TERM | FINAL | MODEL
+  gradingSchemeId Int
+  gradingScheme   GradingScheme   @relation(fields: [gradingSchemeId], references: [id])
+  status          String          @default("DRAFT") // DRAFT | SCHEDULED | CANCELLED (results: ResultApproval, B5)
+  instructions    String?
+  calendarEventId Int? // the EXAM entry made when the schedule is published
+  createdById     Int?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  papers          ExamPaper[]
+  sectionResults  SectionResult[]
+  summaries       ResultSummary[]
+
+  @@unique([instituteId, termId, name])
+  @@index([termId, status])
+}
+
+/**
+ * One subject's paper of an exam for one class, on a date: what students sit and teachers mark.
+ */
+model ExamPaper {
+  id            Int             @id @default(autoincrement())
+  examId        Int
+  exam          Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
+  courseLevelId Int
+  courseLevel   CourseLevel     @relation(fields: [courseLevelId], references: [id])
+  subjectId     Int
+  subject       Subject         @relation(fields: [subjectId], references: [id])
+  date          DateTime // a school day at midnight UTC, like attendance
+  startTime     String
+  endTime       String
+  room          String?
+  fullMarks     Int
+  passMarks     Int
+  examinerId    Int? // TeacherProfile.id: may mark every section's scripts
+  examiner      TeacherProfile? @relation("Examiner", fields: [examinerId], references: [id], onDelete: SetNull)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  sheets        MarkSheet[]
+  marks         Mark[]
+
+  @@unique([examId, courseLevelId, subjectId])
+  @@index([courseLevelId, date])
+  @@index([date]) // LMS B7: paper clash checks across classes
+}
+
+/**
+ * One section's marks for one paper, as a unit of work: a teacher fills it (DRAFT), submits it
+ * (SUBMITTED - no more edits), and only the Head Master can reopen it, with a reason, audited.
+ * LOCKED (results approved, B5) cannot be reopened.
+ */
+model MarkSheet {
+  id            Int       @id @default(autoincrement())
+  paperId       Int
+  paper         ExamPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  sectionId     Int
+  section       Section   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  status        String    @default("DRAFT") // DRAFT | SUBMITTED | LOCKED
+  submittedById Int?
+  submittedAt   DateTime?
+  reopenedById  Int?
+  reopenedAt    DateTime?
+  reopenReason  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([paperId, sectionId])
+  @@index([sectionId])
+}
+
+model Mark {
+  id            Int       @id @default(autoincrement())
+  paperId       Int
+  paper         ExamPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  studentUserId Int
+  student       User      @relation("StudentMarks", fields: [studentUserId], references: [id], onDelete: Cascade)
+  sectionId     Int
+  obtained      Float? // null with isAbsent; otherwise 0..fullMarks
+  isAbsent      Boolean   @default(false)
+  enteredById   Int?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([paperId, studentUserId])
+  @@index([sectionId, paperId])
+  @@index([studentUserId])
+}
+
+/**
+ * ------------------------------------------------- calendar and online classes (LMS B2)
+ */
+
+/**
+ * An entry on the academic calendar: term dates, holidays, exam weeks, events. Dates are whole
+ * days in school time (Asia/Seoul) stored at midnight UTC, end inclusive. Draft until published;
+ * a class-specific entry (`courseLevelId`) is shown only to that class's students.
+ */
+model CalendarEvent {
+  id            Int           @id @default(autoincrement())
+  instituteId   Int
+  institute     Institute     @relation(fields: [instituteId], references: [id])
+  termId        Int?
+  term          AcademicTerm? @relation(fields: [termId], references: [id], onDelete: SetNull)
+  courseLevelId Int?
+  courseLevel   CourseLevel?  @relation(fields: [courseLevelId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  type          String // TERM | HOLIDAY | EXAM | EVENT | MEETING
+  audience      String        @default("ALL") // ALL | STUDENTS | TEACHERS | STAFF
+  startDate     DateTime
+  endDate       DateTime
+  published     Boolean       @default(false)
+  createdById   Int?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([instituteId, startDate])
+}
+
+/**
+ * One meeting of a class online: when it runs, its link, and whether it is scheduled, live,
+ * over or cancelled. The routine slot (`ClassSession`) is the weekly pattern; this is a date.
+ * The link is handed out only through the join endpoint, which logs who joined.
+ */
+model OnlineClass {
+  id             Int               @id @default(autoincrement())
+  classSessionId Int
+  classSession   ClassSession      @relation(fields: [classSessionId], references: [id], onDelete: Cascade)
+  topic          String?
+  startsAt       DateTime
+  endsAt         DateTime
+  joinUrl        String?
+  status         String            @default("SCHEDULED") // SCHEDULED | LIVE | ENDED | CANCELLED
+  startedAt      DateTime?
+  endedAt        DateTime?
+  recordingUrl   String?
+  createdById    Int?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  joins          OnlineClassJoin[]
+
+  @@index([classSessionId, startsAt])
+  @@index([status, startsAt])
+}
+
+/**
+ * A course material (LMS B3): a file, a link or a video for one subject of one class - for every
+ * section of the class (`sectionId` null, set by the Head Master) or for one section (set by a
+ * teacher of that subject there). Students see the published ones for their own sections.
+ */
+model CourseMaterial {
+  id            Int         @id @default(autoincrement())
+  courseLevelId Int
+  courseLevel   CourseLevel @relation(fields: [courseLevelId], references: [id], onDelete: Cascade)
+  subjectId     Int
+  subject       Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  sectionId     Int?
+  section       Section?    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  kind          String // FILE | LINK | VIDEO
+  fileUrl       String? // a stored path under materials/, for FILE
+  linkUrl       String? // an https link, for LINK and VIDEO
+  published     Boolean     @default(true)
+  displayOrder  Int         @default(100)
+  uploadedById  Int?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([courseLevelId, subjectId])
+  @@index([sectionId])
+}
+
+/**
+ * First time each person opened an online class's link.
+ */
+model OnlineClassJoin {
+  id            Int         @id @default(autoincrement())
+  onlineClassId Int
+  onlineClass   OnlineClass @relation(fields: [onlineClassId], references: [id], onDelete: Cascade)
+  userId        Int
+  user          User        @relation("OnlineClassJoins", fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt      DateTime    @default(now())
+
+  @@unique([onlineClassId, userId])
 }
 
 /**
@@ -85,17 +509,19 @@ model Department {
  * `Enrollment.semester`: "2026-2"), so they and this table name the same term.
  */
 model AcademicTerm {
-  id          Int       @id @default(autoincrement())
+  id          Int             @id @default(autoincrement())
   instituteId Int
-  institute   Institute @relation(fields: [instituteId], references: [id])
+  institute   Institute       @relation(fields: [instituteId], references: [id])
   code        String
   name        String
   startDate   DateTime?
   endDate     DateTime?
-  isCurrent   Boolean   @default(false) // at most one per institute; the service keeps it so
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isCurrent   Boolean         @default(false) // at most one per institute; the service keeps it so
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   batches     Batch[]
+  events      CalendarEvent[]
+  exams       Exam[]
 
   @@unique([instituteId, code])
   @@index([instituteId, isCurrent])
@@ -134,6 +560,9 @@ model Section {
   enrollments    SectionEnrollment[]
   assignments    TeacherAssignment[]
   sessions       ClassSession[]
+  materials      CourseMaterial[]
+  markSheets     MarkSheet[]
+  results        SectionResult[]
 
   @@unique([batchId, name])
   @@index([classTeacherId])
@@ -158,6 +587,8 @@ model Subject {
   curriculum   CurriculumSubject[]
   assignments  TeacherAssignment[]
   sessions     ClassSession[]
+  materials    CourseMaterial[]
+  examPapers   ExamPaper[]
 
   @@unique([instituteId, code])
 }
@@ -243,11 +674,11 @@ model User {
   enrollments      Enrollment[]
   attendances      Attendance[]
   submissions      Submission[]
-  payments         Payment[]            @relation("PayerPayments")
-  verifiedPayments Payment[]            @relation("VerifierPayments")
+  payments         Payment[]             @relation("PayerPayments")
+  verifiedPayments Payment[]             @relation("VerifierPayments")
   notifications    Notification[]
-  questionsAsked   Question[]           @relation("StudentQuestions")
-  questionsRecv    Question[]           @relation("TeacherQuestions")
+  questionsAsked   Question[]            @relation("StudentQuestions")
+  questionsRecv    Question[]            @relation("TeacherQuestions")
   teacherTasks     TeacherTask[]
   certificates     Certificate[]
   progressRecords  ProgressRecord[]
@@ -257,11 +688,16 @@ model User {
   auditLogs        AuditLog[]
   passwordResets   PasswordReset[]
   refreshTokens    RefreshToken[]
-  assignedLeads    Lead[]               @relation("LeadOwner")
+  assignedLeads    Lead[]                @relation("LeadOwner")
   leadActivities   LeadActivity[]
   menuPermissions  UserMenuPermission[]
-  departmentsLed   Department[]         @relation("DepartmentHead")
-  sectionPlaces    SectionEnrollment[]  @relation("SectionStudent")
+  departmentsLed   Department[]          @relation("DepartmentHead")
+  sectionPlaces    SectionEnrollment[]   @relation("SectionStudent")
+  onlineJoins      OnlineClassJoin[]     @relation("OnlineClassJoins")
+  marks            Mark[]                @relation("StudentMarks")
+  resultSummaries  ResultSummary[]       @relation("StudentResults")
+  leaves           LeaveApplication[]    @relation("StudentLeaves")
+  transfers        TransferApplication[] @relation("StudentTransfers")
 
   @@index([instituteId, role])
 }
@@ -327,26 +763,27 @@ model StudentProfile {
 }
 
 model TeacherProfile {
-  id            Int                 @id @default(autoincrement())
-  userId        Int                 @unique
-  teacherId     String              @unique // e.g. BCSK-T-001
-  designation   String?
-  bio           String?
-  photoUrl      String?
-  guideClass    String? // guide-teacher class
-  subjects      String? // comma-separated for display
-  isPublic      Boolean             @default(true) // show on public Teachers page and the homepage office board
+  id             Int                 @id @default(autoincrement())
+  userId         Int                 @unique
+  teacherId      String              @unique // e.g. BCSK-T-001
+  designation    String?
+  bio            String?
+  photoUrl       String?
+  guideClass     String? // guide-teacher class
+  subjects       String? // comma-separated for display
+  isPublic       Boolean             @default(true) // show on public Teachers page and the homepage office board
   // Homepage office board (LP-2). `deskStatus` is what a teacher toggles about themselves;
   // "in class" is never stored here - it is derived from owning a live ClassSession, so the
   // office board can never contradict the classroom board.
-  deskName      String? // board label where one teacher holds a named desk: "English-1", "Quran-Female"
-  deskStatus    String              @default("OFFLINE") // DESK | OFFLINE
-  returnAt      DateTime? // when they expect to be back at the desk; null renders as "-"
-  displayOrder  Int                 @default(100)
-  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  classSessions ClassSession[]
-  sectionsLed   Section[]           @relation("ClassTeacher")
-  assignments   TeacherAssignment[]
+  deskName       String? // board label where one teacher holds a named desk: "English-1", "Quran-Female"
+  deskStatus     String              @default("OFFLINE") // DESK | OFFLINE
+  returnAt       DateTime? // when they expect to be back at the desk; null renders as "-"
+  displayOrder   Int                 @default(100)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classSessions  ClassSession[]
+  sectionsLed    Section[]           @relation("ClassTeacher")
+  assignments    TeacherAssignment[]
+  papersExamined ExamPaper[]         @relation("Examiner")
 }
 
 model Course {
@@ -386,6 +823,9 @@ model CourseLevel {
   fees           FeeConfig[]
   batches        Batch[]
   curriculum     CurriculumSubject[]
+  calendarEvents CalendarEvent[]
+  materials      CourseMaterial[]
+  examPapers     ExamPaper[]
 
   @@unique([courseId, code])
   @@index([courseId, displayOrder])
@@ -411,6 +851,7 @@ model ClassSession {
   isLive        Boolean         @default(false)
   liveSince     DateTime? // set when isLive flips on, cleared when it flips off - the board duration
   notice        String?
+  room          String? // LMS B2: a room for in-person slots; checked for double booking
   active        Boolean         @default(true)
   course        Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
   level         CourseLevel?    @relation(fields: [courseLevelId], references: [id])
@@ -419,6 +860,7 @@ model ClassSession {
   attendances   Attendance[]
   assignments   Assignment[]
   videos        ClassVideo[]
+  onlineClasses OnlineClass[]
 
   @@index([courseId])
   @@index([courseLevelId])
@@ -426,6 +868,7 @@ model ClassSession {
   @@index([classLevel, semester, active])
   @@index([semester, active])
   @@index([sectionId])
+  @@index([semester, dayOfWeek, active]) // LMS B7: routine clash checks and the day's classes
 }
 
 model Enrollment {
@@ -448,12 +891,17 @@ model Attendance {
   classSessionId Int
   studentUserId  Int
   date           DateTime
-  status         String // PRESENT | ABSENT | LATE
+  status         String // PRESENT | ABSENT | LATE | EXCUSED (EXCUSED: approved leave, LMS B6)
+  remark         String?
+  markedById     Int? // who last wrote this row (LMS B3); null on rows from before
+  updatedAt      DateTime     @default(now()) @updatedAt
   classSession   ClassSession @relation(fields: [classSessionId], references: [id], onDelete: Cascade)
   student        User         @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
 
   @@unique([classSessionId, studentUserId, date])
   @@index([studentUserId, date])
+  @@index([classSessionId, date])
+  @@index([date]) // LMS B7: institute-wide attendance over a range
 }
 
 model Assignment {
@@ -463,7 +911,10 @@ model Assignment {
   description    String?
   fileUrl        String?
   dueDate        DateTime?
+  maxMarks       Int? // LMS B3: when set, a grade carries numeric marks out of this
+  createdById    Int?
   createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
   classSession   ClassSession @relation(fields: [classSessionId], references: [id], onDelete: Cascade)
   submissions    Submission[]
 
@@ -478,6 +929,7 @@ model Submission {
   text          String?
   submittedAt   DateTime   @default(now())
   grade         String?
+  marks         Float? // LMS B3: out of the assignment's maxMarks
   feedback      String?
   gradedAt      DateTime?
   assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
@@ -719,13 +1171,21 @@ model SupportTicket {
 model Certificate {
   id            Int      @id @default(autoincrement())
   studentUserId Int
-  type          String // ENROLLMENT | ID_CARD | RESULT_SHEET | PROGRESS_REPORT
+  type          String // ENROLLMENT | ID_CARD | RESULT_SHEET | PROGRESS_REPORT | MARK_SHEET | COMPLETION | CHARACTER | TRANSFER_LETTER
   serial        String   @unique
   dataJson      String // snapshot of rendered data
   issuedAt      DateTime @default(now())
   student       User     @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
+  // LMS: the exam a mark sheet or certificate was issued from, who issued it, and a revocation.
+  // A revoked serial still verifies, as revoked, so a withdrawn paper copy cannot pass as valid.
+  examId        Int?
+  issuedById    Int?
+  revokedAt     DateTime?
+  revokedById   Int?
+  revokeReason  String?
 
   @@index([studentUserId])
+  @@index([examId])
 }
 
 model Notification {
@@ -889,13 +1349,17 @@ model ExamResult {
   semester      String
   subject       String
   fullMarks     Int     @default(100)
-  marks         Int
+  marks         Float // LMS B5: halves are allowed in exam marks
   grade         String?
   remark        String?
+  // LMS B5: set on rows written by publishing an exam's results, so a withdrawal removes exactly
+  // those; null on rows the office entered by hand.
+  examId        Int?
   student       User    @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
 
   @@unique([studentUserId, semester, subject])
   @@index([studentUserId, semester])
+  @@index([examId])
 }
 
 model AuditLog {

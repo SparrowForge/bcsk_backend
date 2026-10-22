@@ -40,8 +40,8 @@ const HEAD_MASTER_ALLOWED: Permission[] = [
   "institute:manage", "departments:manage", "subjects:manage", "sections:manage",
   "courses:manage", "scheduling:manage", "staff:read", "students:read", "calendar:manage",
   "attendance:record", "materials:manage", "assignments:manage", "exams:manage",
-  "results:approve", "results:publish", "reports:manage", "leave:review", "leave:decide",
-  "transfer:decide", "analytics:read", "audit:read",
+  "results:approve", "results:publish", "reports:manage", "certificates:issue", "leave:review", "leave:decide",
+  "transfer:verify", "transfer:decide", "analytics:read", "audit:read",
 ];
 
 describe("Head Master permission matrix", () => {
@@ -56,11 +56,12 @@ describe("Head Master permission matrix", () => {
     ]));
     for (const p of denied) expect(permissionsFor("HEAD_MASTER")).not.toContain(p);
   });
-  it("leaves the existing roles exactly as they were", () => {
+  it("leaves the existing roles as they were, apart from the office's transfer clearance and certificates", () => {
     const lms = PERMISSIONS.slice(PERMISSIONS.indexOf("institute:manage"));
-    for (const role of ["ADMIN_SUPPORT", "IT_SUPPORT"] as Role[]) {
-      for (const p of lms) expect(permissionsFor(role)).not.toContain(p);
-    }
+    for (const p of lms) expect(permissionsFor("IT_SUPPORT")).not.toContain(p);
+    // B6: the office clears dues and library on a transfer, and prints certificates as it printed
+    // student documents before; nothing else of the LMS is theirs.
+    expect(lms.filter((p) => permissionsFor("ADMIN_SUPPORT").includes(p))).toEqual(["certificates:issue", "transfer:verify"]);
     expect(permissionsFor("IT_SUPPORT")).toEqual(["users:manage", "tickets:manage"]);
     expect(permissionsFor("TEACHER")).toEqual([]);
     expect(permissionsFor("STUDENT")).toEqual([]);
@@ -248,13 +249,29 @@ describe("refresh token rotation", () => {
     expect(next.familyId).toBe(first.familyId);
     expect(rows.filter((r) => r.revokedAt === null)).toHaveLength(1);
   });
-  it("treats reuse of a consumed token as theft and revokes the whole family", async () => {
+  it("answers a second use within a minute of rotation as 'in progress', revoking nothing", async () => {
     const { svc, rows } = refreshStore();
     const first = await svc.issue(1);
     const second = await svc.rotate(first.refreshToken);
+    await expect(svc.rotate(first.refreshToken)).rejects.toMatchObject({ code: "CONFLICT", details: { reason: "refresh_in_progress" } });
+    expect(rows.filter((r) => r.revokedAt === null)).toHaveLength(1);
+    await expect(svc.rotate(second.refreshToken)).resolves.toMatchObject({ userId: 1 });
+  });
+  it("treats reuse of a consumed token after that minute as theft and revokes the whole family", async () => {
+    const { svc, rows } = refreshStore();
+    const first = await svc.issue(1);
+    const second = await svc.rotate(first.refreshToken);
+    // Age the consumed token past the grace window.
+    rows[0]!.lastUsedAt = new Date(Date.now() - 61_000);
     await expect(svc.rotate(first.refreshToken)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
     expect(rows.every((r) => r.revokedAt !== null)).toBe(true);
     await expect(svc.rotate(second.refreshToken)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
+  });
+  it("gives a logged-out token no grace", async () => {
+    const { svc } = refreshStore();
+    const t = await svc.issue(1);
+    await svc.revoke(t.refreshToken); // logout stamps no lastUsedAt
+    await expect(svc.rotate(t.refreshToken)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
   });
   it("stops working after logout", async () => {
     const { svc } = refreshStore();

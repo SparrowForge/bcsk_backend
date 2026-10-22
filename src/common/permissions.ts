@@ -51,9 +51,11 @@ export const PERMISSIONS = [
   "assignments:manage",
   "exams:manage", // exams, papers, schedule
   "results:approve", // approve or return a section's results
-  "results:publish",
+  "results:publish", // also withholding one student's result
+  "certificates:issue", // issue and revoke certificates; mark sheets and letters come with their workflow
   "leave:review",
   "leave:decide",
+  "transfer:verify", // clear a transfer: dues and library (the office)
   "transfer:decide",
   "analytics:read",
 ] as const;
@@ -82,6 +84,8 @@ const ADMIN_SUPPORT_PERMISSIONS: Permission[] = [
   "leads:read",
   "leads:manage",
   "coupons:manage",
+  "transfer:verify", // LMS B6: the office clears dues and library before the Head Master decides
+  "certificates:issue", // the office already printed student documents before the LMS
 ];
 
 /** IT support: accounts and the support queue. Deliberately no money, no admissions. */
@@ -114,8 +118,10 @@ const HEAD_MASTER_PERMISSIONS: Permission[] = [
   "results:approve",
   "results:publish",
   "reports:manage",
+  "certificates:issue",
   "leave:review",
   "leave:decide",
+  "transfer:verify", // the Head Master can clear a transfer too (B6 decision)
   "transfer:decide",
   "analytics:read",
   "audit:read",

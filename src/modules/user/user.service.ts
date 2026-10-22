@@ -196,6 +196,6 @@ export class UserService {
 
     const token = await this.auth.signSession(user);
     const { refreshToken } = await this.refresh.issue(user.id);
-    return { ok: true, token, refreshToken };
+    return { ok: true, token, refreshToken, expiresIn: this.auth.sessionMaxAgeSeconds };
   }
 }

@@ -1,8 +1,8 @@
 import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
-import { IS_PUBLIC, REQUIRED_MENU, REQUIRED_PERMISSION, ROLES_REQUIRED } from "../decorators/actor.decorator";
-import { flagForMethod } from "../menu-permissions";
+import { IS_PUBLIC, REQUIRED_MENU, REQUIRED_MENU_FLAG, REQUIRED_PERMISSION, ROLES_REQUIRED } from "../decorators/actor.decorator";
+import { flagForMethod, type MenuFlag } from "../menu-permissions";
 import type { Role } from "../constants";
 import { AuthService } from "../../modules/auth/auth.service";
 import type { Permission } from "../permissions";
@@ -47,7 +47,10 @@ export class AuthGuard implements CanActivate {
 
     // Teacher and student pages are checked per menu: the switch this HTTP method needs.
     const menuKey = this.reflector.getAllAndOverride<string | undefined>(REQUIRED_MENU, targets);
-    if (menuKey && !actorCanOnMenu(actor, menuKey, flagForMethod(req.method))) {
+    const flag = menuKey
+      ? (this.reflector.getAllAndOverride<MenuFlag | undefined>(REQUIRED_MENU_FLAG, targets) ?? flagForMethod(req.method))
+      : null;
+    if (menuKey && flag && !actorCanOnMenu(actor, menuKey, flag)) {
       log.warn("auth", "api_menu_denied", { route: req.originalUrl, userId: actor.userId, role: actor.role, menu: menuKey });
       throw forbidden("You don't have access to this.");
     }

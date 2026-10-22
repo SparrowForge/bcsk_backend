@@ -50,6 +50,12 @@ const POLICY: Record<string, Decision> = {
   books: (a) => a.role === "STUDENT" || a.role === "TEACHER" || isStaffReader(a),
   assignments: (a) => a.role === "STUDENT" || a.role === "TEACHER" || isStaffReader(a),
   "class-videos": (a) => a.role === "STUDENT" || a.role === "TEACHER" || isStaffReader(a),
+  // LMS B3: course materials. Which material a student may see is decided by the materials
+  // list (their own sections); the path it hands out is unguessable, as for `assignments`.
+  materials: (a) => a.role === "STUDENT" || a.role === "TEACHER" || actorHas(a, "materials:manage"),
+  // LMS B6: notes attached to leave requests (a doctor's note). The path is unguessable and is
+  // handed out only with the request, to the student, their class teacher and the Head Master.
+  leave: (a) => a.role === "STUDENT" || a.role === "TEACHER" || actorHas(a, "leave:review") || actorHas(a, "leave:decide"),
   submissions: ownerOnly(true),
   "student-docs": ownerOnly(true),
 };

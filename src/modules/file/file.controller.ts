@@ -9,7 +9,7 @@ import { Public } from "../../common/decorators/actor.decorator";
 import { RateLimitService } from "../../common/rate-limit.service";
 import { clientIp } from "../../common/client-ip";
 import { unprocessable, forbidden } from "../../common/errors/app-error";
-import type { Actor } from "../../common/actor";
+import { actorHas, type Actor } from "../../common/actor";
 
 /**
  * SEC-5.1: deny-by-default file delivery.
@@ -44,12 +44,18 @@ export class FileController {
     if (!file) throw unprocessable("No file was received.");
 
     const { folder } = z
-      .object({ folder: z.enum(["applications", "receipts", "submissions", "assignments", "gallery", "books"]) })
+      .object({ folder: z.enum(["applications", "receipts", "submissions", "assignments", "gallery", "books", "materials", "leave"]) })
       .parse(body);
 
     // Anonymous callers may only attach to their own application or payment.
     const anonymousFolders = ["applications", "receipts"];
     if (!req.actor && !anonymousFolders.includes(folder)) throw forbidden();
+    // LMS B3: course materials come from teachers and the material library's managers only.
+    if (folder === "materials" && !(req.actor?.role === "TEACHER" || (req.actor && actorHas(req.actor, "materials:manage")))) {
+      throw forbidden();
+    }
+    // LMS B6: a leave note comes from the student applying.
+    if (folder === "leave" && req.actor?.role !== "STUDENT") throw forbidden();
 
     // Its own bucket: a family uploads a photo *and* a receipt, and sharing the five-an-hour
     // application allowance locked them out of paying after one corrected form.
@@ -62,6 +68,8 @@ export class FileController {
       assignments: 10 * 1024 * 1024,
       gallery: 8 * 1024 * 1024,
       books: 30 * 1024 * 1024,
+      materials: 30 * 1024 * 1024,
+      leave: 5 * 1024 * 1024,
     };
     return this.files.upload(
       { buffer: file.buffer, mimetype: file.mimetype, size: file.size },

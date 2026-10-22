@@ -8,6 +8,7 @@ import { conflict, notFound, unprocessable } from "../../common/errors/app-error
 import { toPage, toPrismaPage, type PageRequest } from "../../common/pagination/cursor";
 import { log } from "../../common/logger";
 import type { Actor } from "../../common/actor";
+import { assertNoClash } from "../schedule/clash";
 
 /**
  * A Student Corner kind as a stable key: "Handy crafts" and "HANDY_CRAFTS" are one kind, so
@@ -498,17 +499,21 @@ export class AdminService {
   }
 
   async updateSession(id: number, input: Record<string, unknown>, actor: Actor) {
-    const row = await this.prisma.classSession.update({
-      where: { id },
-      data: {
-        dayOfWeek: String(input.dayOfWeek ?? "Saturday"),
-        startTime: String(input.startTime ?? "10:00"),
-        endTime: (String(input.endTime ?? "") || null) as string | null,
-        teacherId: input.teacherId ? Number(input.teacherId) : null,
-        zoomLink: (String(input.zoomLink ?? "") || null) as string | null,
-        active: Boolean(input.active),
-      },
-    });
+    const before = await this.prisma.classSession.findUnique({ where: { id }, select: { semester: true, sectionId: true, room: true } });
+    if (!before) throw notFound("Class");
+    const data = {
+      dayOfWeek: String(input.dayOfWeek ?? "Saturday"),
+      startTime: String(input.startTime ?? "10:00"),
+      endTime: (String(input.endTime ?? "") || null) as string | null,
+      teacherId: input.teacherId ? Number(input.teacherId) : null,
+      zoomLink: (String(input.zoomLink ?? "") || null) as string | null,
+      active: Boolean(input.active),
+    };
+    // LMS B2: the same clash rules as the routine builder, so this older screen cannot double-book.
+    if (data.active) {
+      await assertNoClash(this.prisma, { id, ...data, semester: before.semester, sectionId: before.sectionId, room: before.room, instituteId: actor.instituteId });
+    }
+    const row = await this.prisma.classSession.update({ where: { id }, data });
     await this.audit.record(actor.userId, "SCHEDULE_UPDATE", "ClassSession", id);
     return row;
   }
@@ -517,19 +522,19 @@ export class AdminService {
     const courseId = Number(input.courseId);
     const title = String(input.title ?? "").trim();
     if (!courseId || !title) throw unprocessable("Course and title are required.");
-    const row = await this.prisma.classSession.create({
-      data: {
-        courseId,
-        courseLevelId: input.courseLevelId ? Number(input.courseLevelId) : null,
-        classLevel: (String(input.classLevel ?? "") || null) as string | null,
-        title,
-        dayOfWeek: String(input.dayOfWeek ?? "Saturday"),
-        startTime: String(input.startTime ?? "10:00"),
-        endTime: (String(input.endTime ?? "") || null) as string | null,
-        semester: SEMESTER_CURRENT,
-        teacherId: input.teacherId ? Number(input.teacherId) : null,
-      },
-    });
+    const data = {
+      courseId,
+      courseLevelId: input.courseLevelId ? Number(input.courseLevelId) : null,
+      classLevel: (String(input.classLevel ?? "") || null) as string | null,
+      title,
+      dayOfWeek: String(input.dayOfWeek ?? "Saturday"),
+      startTime: String(input.startTime ?? "10:00"),
+      endTime: (String(input.endTime ?? "") || null) as string | null,
+      semester: SEMESTER_CURRENT,
+      teacherId: input.teacherId ? Number(input.teacherId) : null,
+    };
+    await assertNoClash(this.prisma, { ...data, sectionId: null, room: null, instituteId: actor.instituteId });
+    const row = await this.prisma.classSession.create({ data });
     await this.audit.record(actor.userId, "SCHEDULE_CREATE", "ClassSession", row.id, title);
     return row;
   }

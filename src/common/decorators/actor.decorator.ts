@@ -1,6 +1,7 @@
-import { createParamDecorator, ExecutionContext, SetMetadata } from "@nestjs/common";
+import { applyDecorators, createParamDecorator, ExecutionContext, SetMetadata } from "@nestjs/common";
 import type { Request } from "express";
 import type { Actor } from "../actor";
+import type { MenuFlag } from "../menu-permissions";
 import type { Permission } from "../permissions";
 import type { Role } from "../constants";
 
@@ -29,7 +30,15 @@ export const Roles = (...roles: Role[]) => SetMetadata(ROLES_REQUIRED, roles);
  * checked per page-group; admin routes use `@RequirePermission`, which the admin menus grant.
  */
 export const REQUIRED_MENU = "requiredMenu";
-export const RequireMenu = (menuKey: string) => SetMetadata(REQUIRED_MENU, menuKey);
+export const REQUIRED_MENU_FLAG = "requiredMenuFlag";
+/**
+ * `flag` overrides the method's switch for a route whose method does not say what it does - a
+ * student opening a class link is a POST (it logs the join) but is reading, not inserting.
+ */
+export const RequireMenu = (menuKey: string, flag?: MenuFlag) =>
+  flag
+    ? applyDecorators(SetMetadata(REQUIRED_MENU, menuKey), SetMetadata(REQUIRED_MENU_FLAG, flag))
+    : SetMetadata(REQUIRED_MENU, menuKey);
 
 /** Injects the resolved actor into a controller method. */
 export const CurrentActor = createParamDecorator((_data: unknown, ctx: ExecutionContext): Actor => {

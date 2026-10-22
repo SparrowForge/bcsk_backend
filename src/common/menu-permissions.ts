@@ -72,6 +72,14 @@ export const MENU_GRANTS: Record<string, Partial<Record<MenuFlag, readonly Permi
   users: { access: ["users:manage"] },
   settings: { access: ["settings:manage"] },
   audit: { access: ["audit:read"] },
+  // LMS F1: the academic setup screens.
+  institute: { access: ["institute:manage"] },
+  departments: { access: ["departments:manage"] },
+  terms: { access: ["sections:manage"] },
+  sections: { access: ["sections:manage"] },
+  subjects: { access: ["subjects:manage"] },
+  routine: { access: ["scheduling:manage"] },
+  calendar: { access: ["calendar:manage"] },
 };
 
 /**
@@ -97,6 +105,13 @@ const SEEDS: Seed[] = [
   { key: "curriculum", panel: "ADMIN", module: "Academics", label: "General Classes", href: "/admin/curriculum", note: "Class pages and their books on the public site" },
   { key: "scheduling", panel: "ADMIN", module: "Academics", label: "Scheduling", href: "/admin/scheduling" },
   { key: "reports", panel: "ADMIN", module: "Academics", label: "Reports", href: "/admin/reports", note: "Exam results and student documents" },
+  { key: "routine", panel: "ADMIN", module: "Academics", label: "Class Routine", href: "/admin/routine", note: "Weekly slots per section, checked for clashes" },
+  { key: "calendar", panel: "ADMIN", module: "Academics", label: "Academic Calendar", href: "/admin/calendar" },
+  { key: "institute", panel: "ADMIN", module: "Academic Setup", label: "Institute Profile", href: "/admin/institute" },
+  { key: "departments", panel: "ADMIN", module: "Academic Setup", label: "Departments", href: "/admin/departments" },
+  { key: "terms", panel: "ADMIN", module: "Academic Setup", label: "Terms", href: "/admin/terms" },
+  { key: "sections", panel: "ADMIN", module: "Academic Setup", label: "Classes & Sections", href: "/admin/sections", note: "Sections, students and teacher assignment" },
+  { key: "subjects", panel: "ADMIN", module: "Academic Setup", label: "Subjects", href: "/admin/subjects", note: "Subjects and what each class studies" },
   { key: "users", panel: "ADMIN", module: "Administration", label: "Users", href: "/admin/users" },
   { key: "settings", panel: "ADMIN", module: "Administration", label: "Settings", href: "/admin/settings" },
   { key: "audit", panel: "ADMIN", module: "Administration", label: "Audit Log", href: "/admin/audit" },

@@ -23,7 +23,7 @@ const ofPanel = (p: string) => DEFAULT_MENUS.filter((m) => m.panel === p);
 
 describe("menu catalog", () => {
   it("covers every admin sidebar menu, and the teacher and student panels", () => {
-    expect(ofPanel("ADMIN")).toHaveLength(19);
+    expect(ofPanel("ADMIN")).toHaveLength(26); // 19, plus the seven LMS F1 academic screens
     expect(ofPanel("TEACHER").map((m) => m.label)).toEqual(["My Classes", "Questions", "Task List", "Guardians"]);
     expect(ofPanel("STUDENT").length).toBe(10);
   });

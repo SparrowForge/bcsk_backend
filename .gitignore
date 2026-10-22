@@ -5,6 +5,7 @@ dist
 coverage
 src/vendor
 
-# credentials printed by db:seed / db:rotate-passwords - never commit
+# credentials printed by db:seed / db:rotate-passwords / db:create-head-master - never commit
 seeded-credentials-*.txt
 rotated-credentials-*.txt
+head-master-credentials-*.txt

@@ -1,14 +1,23 @@
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import { verifyUrl } from "../config/web";
+import { writeMixed } from "./pdf-fonts";
 
-const NAVY = "#1d2b64";
-const SKY = "#38a8dc";
-const SUNRISE = "#f5820b";
-const INK = "#232323";
-const SOFT = "#5b5b6b";
+export const NAVY = "#1d2b64";
+export const SKY = "#38a8dc";
+export const SUNRISE = "#f5820b";
+export const INK = "#232323";
+export const SOFT = "#5b5b6b";
 
-function docToBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
+/** Who a document is from - the institute row (LMS B5). The defaults are BCSK's. */
+export type Letterhead = { name: string; tagline?: string | null; contact?: string | null };
+const BCSK_HEAD: Letterhead = {
+  name: "Bangladesh Community School",
+  tagline: "The first Bangladeshi community school in South Korea",
+  contact: "bcskr22@gmail.com  ·  +82 10-6893-6237  ·  Yongin-si, Gyeonggi-do",
+};
+
+export function docToBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     doc.on("data", (c: Buffer) => chunks.push(c));
@@ -18,23 +27,23 @@ function docToBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
   });
 }
 
-function letterhead(doc: PDFKit.PDFDocument, title: string) {
+export function letterhead(doc: PDFKit.PDFDocument, title: string, head: Letterhead = BCSK_HEAD) {
   doc.rect(0, 0, doc.page.width, 90).fill(NAVY);
-  doc.fill("white").font("Helvetica-Bold").fontSize(18).text("Bangladesh Community School", 50, 24);
+  doc.fill("white").font("Helvetica-Bold").fontSize(18).text(head.name, 50, 24);
   doc.font("Helvetica").fontSize(9).fillColor("#d9eef8")
-    .text("The first Bangladeshi community school in South Korea", 50, 48)
-    .text("bcskr22@gmail.com  ·  +82 10-6893-6237  ·  Yongin-si, Gyeonggi-do", 50, 62);
+    .text(head.tagline ?? "", 50, 48)
+    .text(head.contact ?? "", 50, 62);
   doc.moveDown(2);
-  doc.fillColor(SUNRISE).font("Helvetica-Bold").fontSize(16).text(title, 50, 115);
+  writeMixed(doc.fillColor(SUNRISE).fontSize(16), title, 50, 115, {}, true);
   doc.moveTo(50, 138).lineTo(doc.page.width - 50, 138).lineWidth(1).strokeColor(SKY).stroke();
 }
 
 /** Today in Korea — the school's calendar, and the date the public verify page shows. */
-function seoulDate(d = new Date()): string {
+export function seoulDate(d = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(d);
 }
 
-function footer(doc: PDFKit.PDFDocument, serial: string) {
+export function footer(doc: PDFKit.PDFDocument, serial: string) {
   const y = doc.page.height - 64;
   const opts = { width: doc.page.width - 100, align: "center" as const };
   // Used to print "Verify: bcskr.org" — the old Google Sites domain, which has no verify page.

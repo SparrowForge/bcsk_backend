@@ -4,6 +4,8 @@ import { SEMESTER_CURRENT } from "../../common/constants";
 import { conflict, forbidden, notFound, unprocessable } from "../../common/errors/app-error";
 import { randomBytes } from "node:crypto";
 import type { Actor, MaybeActor } from "../../common/actor";
+import { currentTermCode, studentSlotsWhere } from "../schedule/class-scope";
+import { byWeekTime } from "../schedule/routine.service";
 
 /**
  * The student surface. Every query is scoped to the calling actor's own id — a student can
@@ -31,14 +33,10 @@ export class ClassroomService {
     return { profile, enrollments, notifications, semester: SEMESTER_CURRENT };
   }
 
+  /** Every assignment of every class the student has belonged to - by section or by enrolment. */
   async assignments(actor: Actor) {
-    const enrolled = await this.prisma.enrollment.findMany({
-      where: { studentUserId: actor.userId, status: "ACTIVE" },
-      select: { classSessionId: true },
-    });
-    const ids = enrolled.map((e) => e.classSessionId);
     return this.prisma.assignment.findMany({
-      where: { classSessionId: { in: ids } },
+      where: { classSession: studentSlotsWhere(actor, null) },
       include: {
         classSession: { select: { title: true } },
         submissions: { where: { studentUserId: actor.userId } },
@@ -51,11 +49,14 @@ export class ClassroomService {
     const assignment = await this.prisma.assignment.findUnique({ where: { id: assignmentId } });
     if (!assignment) throw notFound("Assignment");
 
-    // Enrolment is the authorisation: a student may only submit to their own class.
-    const enrolled = await this.prisma.enrollment.findFirst({
-      where: { studentUserId: actor.userId, classSessionId: assignment.classSessionId, status: "ACTIVE" },
+    // Membership is the authorisation: a student may only submit to a class they are in this
+    // term - through their section (LMS B3) or a direct enrolment.
+    const semester = await currentTermCode(this.prisma, actor.instituteId);
+    const member = await this.prisma.classSession.findFirst({
+      where: { id: assignment.classSessionId, ...studentSlotsWhere(actor, semester) },
+      select: { id: true },
     });
-    if (!enrolled) throw forbidden("You are not enrolled in this class.");
+    if (!member) throw forbidden("You are not enrolled in this class.");
     if (!text && !filePath) throw unprocessable("Attach a file or write your answer before submitting.");
 
     // Once the teacher has graded it, the work is final. Replacing it used to keep the old grade
@@ -145,21 +146,27 @@ export class ClassroomService {
     }));
   }
 
+  /**
+   * The student's week (LMS B2): their sections' slots plus any they are enrolled in directly,
+   * this term, Saturday first. The teacher is narrowed to a name - this used to include the
+   * whole user row, password hash and all.
+   */
   async routine(actor: Actor) {
-    const enrollments = await this.prisma.enrollment.findMany({
-      where: { studentUserId: actor.userId, semester: SEMESTER_CURRENT, status: "ACTIVE" },
-      include: { classSession: { include: { teacher: { include: { user: true } } } } },
+    const semester = await currentTermCode(this.prisma, actor.instituteId);
+    const rows = await this.prisma.classSession.findMany({
+      where: studentSlotsWhere(actor, semester),
+      include: {
+        teacher: { select: { id: true, teacherId: true, user: { select: { name: true } } } },
+        subject: { select: { id: true, code: true, name: true } },
+        section: { select: { id: true, name: true } },
+      },
     });
-    return enrollments.map((e) => e.classSession);
+    return byWeekTime(rows);
   }
 
   async videos(actor: Actor) {
-    const enrolled = await this.prisma.enrollment.findMany({
-      where: { studentUserId: actor.userId, status: "ACTIVE" },
-      select: { classSessionId: true },
-    });
     return this.prisma.classVideo.findMany({
-      where: { classSessionId: { in: enrolled.map((e) => e.classSessionId) } },
+      where: { classSession: studentSlotsWhere(actor, null) },
       include: { classSession: { select: { title: true } } },
       orderBy: { recordedAt: "desc" },
     });

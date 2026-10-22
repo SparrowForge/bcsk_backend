@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { PrismaService } from "../../database/prisma.service";
-import { unauthenticated } from "../../common/errors/app-error";
+import { conflict, unauthenticated } from "../../common/errors/app-error";
 import { log } from "../../common/logger";
 
 /**
@@ -19,6 +19,13 @@ import { log } from "../../common/logger";
  */
 
 const DAY_MS = 86_400_000;
+/**
+ * How long after a rotation a second presentation of the same token counts as the same browser
+ * racing itself rather than a stolen copy. Only a token consumed by rotation qualifies (rotation
+ * stamps `lastUsedAt`; logout and family revocation do not), and inside the window no token is
+ * issued - so a thief gains nothing from it.
+ */
+const REUSE_GRACE_MS = 60_000;
 
 function parseTtlDays(raw: string | undefined, fallbackDays: number): number {
   const m = /^(\d+)d$/.exec(raw?.trim() ?? "");
@@ -63,6 +70,14 @@ export class RefreshTokenService {
     });
 
     if (!row) throw unauthenticated("Your session has expired. Please sign in again.");
+
+    if (row.revokedAt && row.lastUsedAt && Date.now() - row.lastUsedAt.getTime() < REUSE_GRACE_MS) {
+      // F0: the web refreshes in its proxy, and a page and its prefetches can present the same
+      // token a moment apart. The first one rotated it; the others are the same browser, not a
+      // thief. Answer "in progress" without revoking - the browser already holds the successor.
+      log.info("auth", "refresh_concurrent", { userId: row.userId, familyId: row.familyId });
+      throw conflict("This session is already being refreshed.", { reason: "refresh_in_progress" });
+    }
 
     if (row.revokedAt) {
       // Theft signal: this token was already rotated away, so someone is holding a copy.

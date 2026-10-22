@@ -24,6 +24,12 @@ import { CouponModule } from "./modules/coupon/coupon.module";
 import { AcademicModule } from "./modules/academic/academic.module";
 import { UserPermissionModule } from "./modules/user-permission/user-permission.module";
 import { StructureModule } from "./modules/structure/structure.module";
+import { ScheduleModule } from "./modules/schedule/schedule.module";
+import { TeachingModule } from "./modules/teaching/teaching.module";
+import { ExamModule } from "./modules/exam/exam.module";
+import { ResultModule } from "./modules/result/result.module";
+import { ApplicationModule } from "./modules/application/application.module";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
 
 @Module({
   imports: [
@@ -53,6 +59,12 @@ import { StructureModule } from "./modules/structure/structure.module";
     AcademicModule,
     UserPermissionModule,
     StructureModule,
+    ScheduleModule,
+    TeachingModule,
+    ExamModule,
+    ResultModule,
+    ApplicationModule,
+    AnalyticsModule,
     HealthModule,
   ],
   providers: [

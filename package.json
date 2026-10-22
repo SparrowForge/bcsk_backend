@@ -18,6 +18,7 @@
     "db:rotate-passwords": "tsx prisma/rotate-passwords.ts",
     "db:backfill-payer": "tsx prisma/backfill-payer-user-id.ts",
     "db:backfill-b1": "tsx prisma/backfill-b1.ts",
+    "db:create-head-master": "tsx prisma/create-head-master.ts",
     "postinstall": "prisma generate && node scripts/bundle-vendor.mjs"
   },
   "prisma": {

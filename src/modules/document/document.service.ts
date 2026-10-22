@@ -115,7 +115,7 @@ export class DocumentService {
    */
   private async serialFor(studentUserId: number, type: string, prefix: string, data: unknown): Promise<string> {
     const current = await this.prisma.certificate.findFirst({
-      where: { studentUserId, type, serial: { startsWith: prefix } },
+      where: { studentUserId, type, serial: { startsWith: prefix }, revokedAt: null },
       orderBy: { issuedAt: "desc" },
       select: { serial: true },
     });
@@ -228,6 +228,10 @@ export class DocumentService {
         studentId: payment.payer?.studentProfile?.studentId ?? null,
         issuedAt: payment.verifiedAt ?? payment.updatedAt,
       };
+    }
+    if (cert.revokedAt) {
+      // Says what was revoked and when - not who it named or why: a revoked document vouches for nothing.
+      return { valid: false as const, revoked: true as const, serial: cert.serial, type: cert.type, issuedAt: cert.issuedAt, revokedAt: cert.revokedAt };
     }
     return {
       valid: true as const,
